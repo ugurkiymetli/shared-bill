@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import html2canvas from 'html2canvas';
+import * as htmlToImage from 'html-to-image';
 import { Image, Copy, Check, Table, Smartphone, Share2 } from 'lucide-react';
 
 export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast }) {
@@ -104,16 +104,19 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
     onAddToast({ type: 'info', message: 'Görsel oluşturuluyor, lütfen bekleyin...' });
 
     try {
-      // Create high resolution image using scale
-      const canvas = await html2canvas(cardRef.current, {
-        useCORS: true,
-        scale: 2, 
+      // Use html-to-image to render the node as PNG data URL.
+      // We pass a high pixel ratio (scale factor) for crisp high-resolution images.
+      const imgData = await htmlToImage.toPng(cardRef.current, {
         backgroundColor: '#020617', // Slate-950
-        logging: false,
-        allowTaint: true,
+        style: {
+          transform: 'scale(1)',
+          transformOrigin: 'top left',
+        },
+        pixelRatio: 2, // High resolution output
+        cacheBust: true,
+        fontEmbedCSS: '', // Disable embedding of web fonts to prevent HMR/CORS hangs
+        skipFonts: true, // Skip font loading to prevent stylesheet reading blocks
       });
-
-      const imgData = canvas.toDataURL('image/png');
 
       // Check for Web Share support
       if (navigator.share && navigator.canShare) {
