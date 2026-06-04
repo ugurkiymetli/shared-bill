@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calculator, FileText, Settings, Sparkles, X, CheckCircle, AlertCircle, Info } from 'lucide-react';
+import { Analytics } from '@vercel/analytics/react';
 import NewBillForm from './components/NewBillForm';
 import ShareCard from './components/ShareCard';
 import HistoryArchive from './components/HistoryArchive';
@@ -322,6 +323,7 @@ export default function App() {
           );
         })}
       </div>
+      <Analytics />
     </div>
   );
 }
