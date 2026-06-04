@@ -83,20 +83,24 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
     setExporting(true);
     onAddToast({ type: 'info', message: 'Görsel oluşturuluyor, lütfen bekleyin...' });
 
+    const node = cardRef.current;
+    const prevWidth = node.style.width;
+    const prevMaxWidth = node.style.maxWidth;
+
     try {
       const isDark = document.documentElement.classList.contains('dark');
-      
-      // Use html-to-image to render the node as PNG data URL.
-      const imgData = await htmlToImage.toPng(cardRef.current, {
+
+      // Pin to a fixed width so responsive (sm:) classes never interfere
+      node.style.width = '480px';
+      node.style.maxWidth = '480px';
+
+      const imgData = await htmlToImage.toPng(node, {
         backgroundColor: isDark ? '#020617' : '#ffffff',
-        style: {
-          transform: 'scale(1)',
-          transformOrigin: 'top left',
-        },
-        pixelRatio: 2, // High resolution output
+        pixelRatio: 2,
         cacheBust: true,
-        fontEmbedCSS: '', // Disable embedding of web fonts to prevent HMR/CORS hangs
-        skipFonts: true, // Skip font loading to prevent stylesheet reading blocks
+        fontEmbedCSS: '',
+        skipFonts: true,
+        width: 480,
       });
 
       // Check for Web Share support
@@ -113,7 +117,6 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
               text: `${apartmentName} ${bill.period} dönemi ${billTypeLabels[bill.type]} faturası bölüşüm tablosu.`,
             });
             onAddToast({ type: 'success', message: 'Görsel başarıyla paylaşıldı!' });
-            setExporting(false);
             return;
           } catch (shareError) {
             console.log('Share dismissed, downloading file instead:', shareError);
@@ -131,6 +134,9 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
       console.error('Görsel kaydetme hatası:', error);
       onAddToast({ type: 'error', message: 'Görsel oluşturulurken bir hata oluştu.' });
     } finally {
+      // Always restore original inline styles
+      node.style.width = prevWidth;
+      node.style.maxWidth = prevMaxWidth;
       setExporting(false);
     }
   };
@@ -186,7 +192,7 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
         <div
           id="share-card"
           ref={cardRef}
-          className="p-6 sm:p-8 bg-white dark:bg-slate-950 text-neutral-900 dark:text-slate-100 border-2 border-neutral-200 dark:border-neutral-800 rounded-2xl min-w-[320px] max-w-[650px] mx-auto space-y-6 relative overflow-hidden transition-colors"
+          className="p-6 bg-white dark:bg-slate-950 text-neutral-900 dark:text-slate-100 border-2 border-neutral-200 dark:border-neutral-800 rounded-2xl min-w-[320px] max-w-[600px] mx-auto space-y-6 relative overflow-hidden transition-colors"
         >
           {/* Background Ambient Decorative Light */}
           <div className="absolute top-0 right-0 w-48 h-48 bg-neutral-500/5 dark:bg-white/2 rounded-full blur-3xl -z-10 pointer-events-none" />
@@ -197,13 +203,15 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
             <span className="inline-block px-3 py-1 rounded-full text-[10px] font-extrabold tracking-wider mb-2 bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-950 uppercase border border-transparent">
               {billTypeLabels[bill.type]} BÖLÜŞÜMÜ
             </span>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-neutral-950 dark:text-white font-outfit uppercase">
+            <h1 className="text-2xl font-extrabold tracking-tight text-neutral-950 dark:text-white font-outfit uppercase">
               {apartmentName}
             </h1>
-            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 mt-2.5 text-xs text-neutral-500 dark:text-neutral-400 font-medium">
-              <span>Dönem: <strong className="text-neutral-800 dark:text-neutral-200">{bill.period}</strong></span>
-              <span className="text-neutral-300 dark:text-neutral-700">•</span>
-              <span>Toplam Tutar: <strong className="text-neutral-900 dark:text-white font-extrabold">₺{formatCurrency(bill.totalAmount)}</strong></span>
+            <div className="flex flex-col items-center gap-1 mt-2.5 text-xs text-neutral-500 dark:text-neutral-400 font-medium">
+              <div className="flex items-center gap-3">
+                <span>Dönem: <strong className="text-neutral-800 dark:text-neutral-200">{bill.period}</strong></span>
+                <span className="text-neutral-300 dark:text-neutral-700">•</span>
+                <span>Toplam Tutar: <strong className="text-neutral-900 dark:text-white font-extrabold">₺{formatCurrency(bill.totalAmount)}</strong></span>
+              </div>
             </div>
             <p className="text-xs text-neutral-800 dark:text-neutral-200 font-bold mt-2 bg-neutral-100 dark:bg-neutral-900 py-1 px-3.5 rounded-lg border border-neutral-200 dark:border-neutral-800 inline-block">
               Son Ödeme Tarihi: {formatDate(bill.dueDate)}
