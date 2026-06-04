@@ -137,14 +137,14 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-neutral-900/60 p-4 rounded-2xl border border-neutral-200 dark:border-neutral-800">
-        <div>
+      <div className="flex flex-wrap justify-between items-start gap-3 bg-white dark:bg-neutral-900/60 p-4 rounded-2xl border border-neutral-200 dark:border-neutral-800">
+        <div className="min-w-0">
           <h3 className="text-lg font-bold text-neutral-900 dark:text-neutral-100 font-outfit">Paylaşım Kartı Önizlemesi</h3>
           <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">Daire sakinleriyle paylaşmak için görsel olarak indirin veya kopyalayın.</p>
         </div>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
           {bill.type === 'electricity' && (
-            <label className="flex items-center gap-2 text-xs font-semibold text-neutral-700 dark:text-neutral-350 cursor-pointer">
+            <label className="flex items-center gap-2 text-xs font-semibold text-neutral-700 dark:text-neutral-350 cursor-pointer shrink-0">
               <input
                 type="checkbox"
                 checked={showDetails}
@@ -154,27 +154,27 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
               <span>Detaylı Görünüm</span>
             </label>
           )}
-          <div className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-950/60 p-1 rounded-xl border border-neutral-200 dark:border-neutral-800 w-full sm:w-auto">
+          <div className="flex items-center gap-1 bg-neutral-100 dark:bg-neutral-950/60 p-1 rounded-xl border border-neutral-200 dark:border-neutral-800 shrink-0">
             <button
               onClick={() => setViewMode('mobile')}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
                 viewMode === 'mobile'
                   ? 'bg-neutral-950 dark:bg-white text-white dark:text-neutral-950 shadow-md'
                   : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200'
               }`}
             >
-              <Smartphone className="w-3.5 h-3.5" />
+              <Smartphone className="w-3.5 h-3.5 shrink-0" />
               Mobil Görünüm
             </button>
             <button
               onClick={() => setViewMode('excel')}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
                 viewMode === 'excel'
                   ? 'bg-neutral-950 dark:bg-white text-white dark:text-neutral-950 shadow-md'
                   : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200'
               }`}
             >
-              <Table className="w-3.5 h-3.5" />
+              <Table className="w-3.5 h-3.5 shrink-0" />
               Excel Tablo
             </button>
           </div>

@@ -162,8 +162,8 @@ export default function NewBillForm({ onCalculate, initialFormValues }) {
           >
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Elektrik Dağıtım Oranları (Ortak / Sabit / Kişisel)</span>
-              <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold ${isRatioValid 
-                ? 'bg-neutral-900 text-neutral-100 dark:bg-neutral-100 dark:text-neutral-900' 
+              <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold ${isRatioValid
+                ? 'bg-neutral-900 text-neutral-100 dark:bg-neutral-100 dark:text-neutral-900'
                 : 'bg-transparent text-neutral-500 dark:text-neutral-400 border border-neutral-300 dark:border-neutral-750'
                 }`}>
                 Toplam: %{ratioSum}
@@ -196,6 +196,7 @@ export default function NewBillForm({ onCalculate, initialFormValues }) {
                   type="range"
                   min="0"
                   max="100"
+                  step={5}
                   value={ratios.common}
                   onChange={(e) => handleRatioChange('common', e.target.value)}
                   className="w-full accent-neutral-950 dark:accent-neutral-100 bg-neutral-200 dark:bg-neutral-800 h-1.5 rounded-lg appearance-none cursor-pointer"
@@ -212,6 +213,7 @@ export default function NewBillForm({ onCalculate, initialFormValues }) {
                   type="range"
                   min="0"
                   max="100"
+                  step={5}
                   value={ratios.fixed}
                   onChange={(e) => handleRatioChange('fixed', e.target.value)}
                   className="w-full accent-neutral-950 dark:accent-neutral-100 bg-neutral-200 dark:bg-neutral-800 h-1.5 rounded-lg appearance-none cursor-pointer"
@@ -228,6 +230,7 @@ export default function NewBillForm({ onCalculate, initialFormValues }) {
                   type="range"
                   min="0"
                   max="100"
+                  step={5}
                   value={ratios.personal}
                   onChange={(e) => handleRatioChange('personal', e.target.value)}
                   className="w-full accent-neutral-950 dark:accent-neutral-100 bg-neutral-200 dark:bg-neutral-800 h-1.5 rounded-lg appearance-none cursor-pointer"
