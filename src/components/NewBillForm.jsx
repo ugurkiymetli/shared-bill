@@ -487,7 +487,7 @@ export default function NewBillForm({ onCalculate, initialFormValues }) {
             type="date"
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
-            className="w-full min-w-0 max-w-full glass-input px-3.5 py-3 rounded-xl text-sm font-mono box-border"
+            className="block w-full min-w-0 max-w-full glass-input px-3.5 py-3 rounded-xl text-sm font-mono appearance-none"
             required
           />
         </div>

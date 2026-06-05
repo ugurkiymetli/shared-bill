@@ -298,7 +298,7 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
                 : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200'}`}
             >
               <Smartphone className="w-3.5 h-3.5 shrink-0" />
-              Mobil Görünüm
+              Liste
             </button>
             <button
               onClick={() => setViewMode('excel')}
@@ -307,7 +307,7 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
                 : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200'}`}
             >
               <Table className="w-3.5 h-3.5 shrink-0" />
-              Excel Tablo
+              Tablo
             </button>
           </div>
         </div>

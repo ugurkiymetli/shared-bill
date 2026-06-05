@@ -20,10 +20,10 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
     if (newlyAddedId) {
       const el = document.getElementById(`resident-name-${newlyAddedId}`);
       if (el) {
-        // Scroll with a small timeout to let the input render first
+        // Scroll with a small timeout to let the input render first and keyboard to open
         setTimeout(() => {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 80);
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 150);
       }
     }
   }, [newlyAddedId]);
