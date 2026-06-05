@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calculator, AlertCircle, ChevronDown, ChevronUp, RefreshCw, FileText, Calendar, DollarSign, Camera, Check, Paperclip, Eye, Trash2 } from 'lucide-react';
+import { Calculator, AlertCircle, ChevronDown, ChevronUp, RefreshCw, FileText, Calendar, DollarSign, Camera, Check, Paperclip, Eye, Trash2, Info } from 'lucide-react';
 import { createWorker } from 'tesseract.js';
 
 export default function NewBillForm({ onCalculate, initialFormValues }) {
@@ -15,6 +15,7 @@ export default function NewBillForm({ onCalculate, initialFormValues }) {
   const [fileName, setFileName] = useState('');
   const [fileUrl, setFileUrl] = useState('');
   const [periodOptions, setPeriodOptions] = useState([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Electricity ratios state
   const [ratios, setRatios] = useState({ common: 10, fixed: 30, personal: 60 });
@@ -365,27 +366,37 @@ export default function NewBillForm({ onCalculate, initialFormValues }) {
       </div>
 
       {fileName && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-neutral-50 dark:bg-neutral-950/20 rounded-xl border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-600 dark:text-neutral-400 animate-fade-in">
-          <Paperclip className="w-3.5 h-3.5 text-neutral-400" />
-          <span className="font-semibold truncate max-w-[150px] sm:max-w-[300px]">{fileName}</span>
-          <div className="ml-auto flex items-center gap-1.5">
-            <a
-              href={fileUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 rounded-lg border border-neutral-300 dark:border-neutral-800 font-bold transition-colors"
-            >
-              <Eye className="w-3 h-3 text-neutral-550 dark:text-neutral-400" />
-              <span>Görüntüle</span>
-            </a>
-            <button
-              type="button"
-              onClick={handleClearFile}
-              className="flex items-center justify-center p-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 rounded-lg border border-rose-500/25 transition-colors"
-              title="Görseli Kaldır"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
+        <div className="flex flex-col gap-3">
+          {/* File details bar */}
+          <div className="flex items-center gap-2 px-3 py-2 bg-neutral-50 dark:bg-neutral-950/20 rounded-xl border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-600 dark:text-neutral-400 animate-fade-in">
+            <Paperclip className="w-3.5 h-3.5 text-neutral-400" />
+            <span className="font-semibold truncate max-w-[150px] sm:max-w-[300px]">{fileName}</span>
+            <div className="ml-auto flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(true)}
+                className="flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 rounded-lg border border-neutral-300 dark:border-neutral-800 font-bold transition-colors cursor-pointer"
+              >
+                <Eye className="w-3 h-3 text-neutral-550 dark:text-neutral-400" />
+                <span>Görüntüle</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleClearFile}
+                className="flex items-center justify-center p-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 rounded-lg border border-rose-500/25 transition-colors cursor-pointer"
+                title="Görseli Kaldır"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+          
+          {/* Warning banner */}
+          <div className="flex items-start gap-2.5 p-3.5 bg-neutral-100 dark:bg-neutral-950/40 border border-neutral-200 dark:border-neutral-800 text-[11px] text-neutral-600 dark:text-neutral-400 rounded-xl font-medium animate-fade-in leading-relaxed">
+            <Info className="w-4 h-4 flex-shrink-0 text-neutral-900 dark:text-neutral-100 mt-0.5" />
+            <div>
+              <span className="font-bold text-neutral-950 dark:text-white">Doğrulama Gerekli:</span> Fatura görselinin kalitesi, ışığı veya katlanma izleri OCR doğruluğunu etkileyebilir. Lütfen faturadaki tutar ve tarihi aşağıdaki alanlardan kontrol ediniz.
+            </div>
           </div>
         </div>
       )}
@@ -611,6 +622,27 @@ export default function NewBillForm({ onCalculate, initialFormValues }) {
           <span>Hesapla ve Önizleme Oluştur</span>
         </button>
       </div>
+
+      {/* In-app Image Viewer Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="relative bg-white dark:bg-neutral-900 rounded-2xl max-w-xl w-full max-h-[85vh] overflow-hidden flex flex-col border border-neutral-200 dark:border-neutral-850 shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-neutral-200 dark:border-neutral-800">
+              <span className="text-xs font-bold text-neutral-600 dark:text-neutral-400 truncate pr-4">{fileName}</span>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="text-xs font-bold px-3 py-1.5 bg-neutral-950 hover:bg-neutral-850 text-white dark:bg-white dark:hover:bg-neutral-200 dark:text-neutral-950 rounded-lg transition-colors cursor-pointer"
+              >
+                Kapat
+              </button>
+            </div>
+            <div className="p-4 flex-grow overflow-auto flex items-center justify-center bg-neutral-950/5 dark:bg-neutral-950/20">
+              <img src={fileUrl} alt="Fatura Görseli" className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-sm" />
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 }
