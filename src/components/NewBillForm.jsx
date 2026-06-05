@@ -1,11 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Calculator, AlertCircle, ChevronDown, ChevronUp, RefreshCw, FileText, Calendar, DollarSign } from 'lucide-react';
+import { Calculator, AlertCircle, ChevronDown, ChevronUp, RefreshCw, FileText, Calendar, DollarSign, Camera, Check, Paperclip, Eye, Trash2 } from 'lucide-react';
+import { createWorker } from 'tesseract.js';
 
 export default function NewBillForm({ onCalculate, initialFormValues }) {
   const [billType, setBillType] = useState('electricity');
   const [totalAmount, setTotalAmount] = useState('');
   const [period, setPeriod] = useState('');
   const [dueDate, setDueDate] = useState('');
+
+  // OCR state
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState(0);
+  const [scanSuccess, setScanSuccess] = useState(false);
+  const [fileName, setFileName] = useState('');
+  const [fileUrl, setFileUrl] = useState('');
 
   // Electricity ratios state
   const [ratios, setRatios] = useState({ common: 10, fixed: 30, personal: 60 });
@@ -58,6 +66,230 @@ export default function NewBillForm({ onCalculate, initialFormValues }) {
     setRatios({ common: 10, fixed: 30, personal: 60 });
   };
 
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setFileName(file.name);
+    if (fileUrl) {
+      URL.revokeObjectURL(fileUrl);
+    }
+    setFileUrl(URL.createObjectURL(file));
+
+    setIsScanning(true);
+    setScanProgress(0);
+    setScanSuccess(false);
+
+    try {
+      // Create worker with turkish language support
+      const worker = await createWorker('tur', 1, {
+        logger: m => {
+          if (m.status === 'recognizing text') {
+            setScanProgress(Math.round(m.progress * 100));
+          }
+        }
+      });
+      
+      const { data: { text } } = await worker.recognize(file);
+      await worker.terminate();
+
+      parseOcrResult(text);
+      setScanSuccess(true);
+      setTimeout(() => setScanSuccess(false), 3000);
+    } catch (err) {
+      console.error(err);
+      alert("Fatura taranırken bir hata oluştu: " + err.message);
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const handleClearFile = () => {
+    setFileName('');
+    if (fileUrl) {
+      URL.revokeObjectURL(fileUrl);
+    }
+    setFileUrl('');
+  };
+
+  const handleResetForm = () => {
+    setTotalAmount('');
+    setFileName('');
+    if (fileUrl) {
+      URL.revokeObjectURL(fileUrl);
+    }
+    setFileUrl('');
+    
+    const now = new Date('2026-06-04T21:34:45+03:00');
+    const months = [
+      'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+      'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+    ];
+    const currentMonth = months[now.getMonth()];
+    const currentYear = now.getFullYear();
+    setPeriod(`${currentMonth} ${currentYear}`);
+
+    const defaultDue = new Date(now);
+    defaultDue.setDate(now.getDate() + 10);
+    const yyyy = defaultDue.getFullYear();
+    const mm = String(defaultDue.getMonth() + 1).padStart(2, '0');
+    const dd = String(defaultDue.getDate()).padStart(2, '0');
+    setDueDate(`${yyyy}-${mm}-${dd}`);
+  };
+
+  const parseOcrResult = (text) => {
+    const normalizedText = text.replace(/\s+/g, ' ');
+    const lowerText = text.toLowerCase();
+    
+    console.log("=== OCR SCAN START ===");
+    console.log("Raw OCR Text:", text);
+    console.log("Normalized OCR Text:", normalizedText);
+
+    // 1. Detect Bill Type
+    if (lowerText.includes('su fatura') || lowerText.includes('ıskı') || lowerText.includes('iski')) {
+      setBillType('water');
+    } else if (lowerText.includes('elektrik') || lowerText.includes('enerji') || lowerText.includes('gediz') || lowerText.includes('ck bogazici')) {
+      setBillType('electricity');
+    } else if (lowerText.includes('aidat') || lowerText.includes('ortak gider') || lowerText.includes('yonetim')) {
+      setBillType('maintenance');
+    }
+
+    // 2. Extract Dates (DD/MM/YYYY or DD.MM.YYYY)
+    // Allows separator to be misread as 1, l, i, ı, | or / or . or -
+    const dateRegex = /(\d{2})[-./1ıil|]?(\d{2})[-./1ıil|]?(\d{4})/g;
+    const dates = [];
+    let match;
+    while ((match = dateRegex.exec(normalizedText)) !== null) {
+      // Validate month (1-12) and day (1-31) to avoid false matches
+      const day = parseInt(match[1], 10);
+      const month = parseInt(match[2], 10);
+      const year = parseInt(match[3], 10);
+      
+      if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 2000 && year <= 2100) {
+        dates.push({
+          original: match[0],
+          formatted: `${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`, // YYYY-MM-DD
+          dateObj: new Date(year, month - 1, day),
+          index: match.index
+        });
+      }
+    }
+    console.log("Detected Dates:", dates);
+
+    // Look for due date keyword context
+    let detectedDueDate = '';
+    const sonOdemeKeywords = ['son odeme', 'odeme tarihi', 'son'];
+    let bestDateMatch = null;
+    let minDistance = Infinity;
+
+    sonOdemeKeywords.forEach(kw => {
+      const kwIndex = normalizedText.toLowerCase().indexOf(kw);
+      if (kwIndex !== -1) {
+        dates.forEach(d => {
+          const dist = Math.abs(d.index - kwIndex);
+          if (dist < minDistance) {
+            minDistance = dist;
+            bestDateMatch = d;
+          }
+        });
+      }
+    });
+
+    if (bestDateMatch) {
+      detectedDueDate = bestDateMatch.formatted;
+    } else if (dates.length > 0) {
+      // Fallback: Use the latest date found in the bill as the due date
+      const sortedDates = [...dates].sort((a, b) => b.dateObj - a.dateObj);
+      detectedDueDate = sortedDates[0].formatted;
+    }
+
+    if (detectedDueDate) {
+      setDueDate(detectedDueDate);
+      console.log("Selected Due Date:", detectedDueDate);
+    }
+
+    // 3. Extract Amount
+    // Matches patterns like "7.904,00" or "7,904.00" or "7686,00" or "7686.00" (with or without thousands separator)
+    const amountRegex = /\b\d+(?:[.,]\d{3})*[.,]\d{2}\b/g;
+    const amounts = [];
+    
+    const parseTurkishOrUniversalFloat = (str) => {
+      const lastComma = str.lastIndexOf(',');
+      const lastDot = str.lastIndexOf('.');
+      if (lastComma > lastDot) {
+        // e.g. 7.904,00 -> 7904.00
+        return parseFloat(str.replace(/\./g, '').replace(',', '.'));
+      } else if (lastDot > lastComma) {
+        // e.g. 7,904.00 -> 7904.00
+        return parseFloat(str.replace(/,/g, ''));
+      } else {
+        return parseFloat(str.replace(',', '.'));
+      }
+    };
+
+    while ((match = amountRegex.exec(normalizedText)) !== null) {
+      const val = parseTurkishOrUniversalFloat(match[0]);
+      if (!isNaN(val)) {
+        amounts.push({
+          val,
+          original: match[0],
+          index: match.index
+        });
+      }
+    }
+    console.log("Detected Amounts:", amounts);
+
+    let detectedAmount = '';
+    const amountKeywords = ['odenecek', 'tutar', 'toplam', 'donem tutar', 'tl'];
+    let bestAmountMatch = null;
+    let minAmountDistance = Infinity;
+
+    amountKeywords.forEach(kw => {
+      const kwIndex = normalizedText.toLowerCase().indexOf(kw);
+      if (kwIndex !== -1) {
+        amounts.forEach(a => {
+          const dist = Math.abs(a.index - kwIndex);
+          if (dist < minAmountDistance) {
+            minAmountDistance = dist;
+            bestAmountMatch = a;
+          }
+        });
+      }
+    });
+
+    if (bestAmountMatch) {
+      detectedAmount = bestAmountMatch.val.toString();
+    } else if (amounts.length > 0) {
+      // Fallback: pick the largest amount that is not suspiciously huge
+      const reasonableAmounts = amounts.filter(a => a.val > 5 && a.val < 100000);
+      if (reasonableAmounts.length > 0) {
+        reasonableAmounts.sort((a, b) => b.val - a.val);
+        detectedAmount = reasonableAmounts[0].val.toString();
+      }
+    }
+
+    if (detectedAmount) {
+      setTotalAmount(detectedAmount);
+      console.log("Selected Amount:", detectedAmount);
+    }
+
+    // 4. Period detection
+    if (dates.length > 0) {
+      const months = [
+        'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+        'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+      ];
+      const dateToUse = dates.find(d => d.formatted !== detectedDueDate) || dates[0];
+      if (dateToUse) {
+        const m = dateToUse.dateObj.getMonth();
+        const y = dateToUse.dateObj.getFullYear();
+        setPeriod(`${months[m]} ${y}`);
+        console.log("Selected Period:", `${months[m]} ${y}`);
+      }
+    }
+    console.log("=== OCR SCAN END ===");
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (billType === 'electricity' && !isRatioValid) {
@@ -76,10 +308,74 @@ export default function NewBillForm({ onCalculate, initialFormValues }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5 bg-white dark:bg-neutral-900/40 p-6 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-lg dark:shadow-2xl animate-fade-in transition-all">
-      <div className="flex items-center gap-2.5 pb-4 border-b border-neutral-200 dark:border-neutral-800/80">
-        <Calculator className="w-5 h-5 text-neutral-900 dark:text-neutral-100" />
-        <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100 font-outfit">Fatura Girişi ve Bölüşüm</h2>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-neutral-200 dark:border-neutral-800/80">
+        <div className="flex items-center gap-2.5">
+          <Calculator className="w-5 h-5 text-neutral-900 dark:text-neutral-100" />
+          <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100 font-outfit">Fatura Girişi ve Bölüşüm</h2>
+        </div>
+        
+        {/* OCR Scan Button */}
+        <div>
+          <label className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+            isScanning
+              ? 'bg-neutral-100 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-neutral-500'
+              : scanSuccess
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+              : 'bg-white hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800 border-neutral-300 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200'
+          }`}>
+            {isScanning ? (
+              <>
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-neutral-500" />
+                <span>Taranıyor (%{scanProgress})...</span>
+              </>
+            ) : scanSuccess ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Fatura Okundu</span>
+              </>
+            ) : (
+              <>
+                <Camera className="w-3.5 h-3.5 text-neutral-550 dark:text-neutral-400" />
+                <span>Fatura Fotoğrafı Yükle</span>
+              </>
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleFileChange}
+              disabled={isScanning}
+              className="hidden"
+            />
+          </label>
+        </div>
       </div>
+
+      {fileName && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-neutral-50 dark:bg-neutral-950/20 rounded-xl border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-600 dark:text-neutral-400 animate-fade-in">
+          <Paperclip className="w-3.5 h-3.5 text-neutral-400" />
+          <span className="font-semibold truncate max-w-[150px] sm:max-w-[300px]">{fileName}</span>
+          <div className="ml-auto flex items-center gap-1.5">
+            <a
+              href={fileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 rounded-lg border border-neutral-300 dark:border-neutral-800 font-bold transition-colors"
+            >
+              <Eye className="w-3 h-3 text-neutral-550 dark:text-neutral-400" />
+              <span>Görüntüle</span>
+            </a>
+            <button
+              type="button"
+              onClick={handleClearFile}
+              className="flex items-center justify-center p-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 rounded-lg border border-rose-500/25 transition-colors"
+              title="Görseli Kaldır"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Bill Type Dropdown */}
@@ -108,11 +404,39 @@ export default function NewBillForm({ onCalculate, initialFormValues }) {
           <div className="relative">
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-neutral-500 font-bold text-sm">₺</span>
             <input
-              type="number"
-              step="0.01"
-              min="0.01"
-              value={totalAmount}
-              onChange={(e) => setTotalAmount(e.target.value)}
+              type="text"
+              value={(() => {
+                if (!totalAmount) return '';
+                const parts = totalAmount.toString().split('.');
+                const integerPart = parts[0];
+                const decimalPart = parts[1];
+                const formattedInteger = Number(integerPart).toLocaleString('tr-TR');
+                if (integerPart === '' || isNaN(Number(integerPart))) {
+                  return '';
+                }
+                let result = formattedInteger;
+                if (totalAmount.toString().includes('.')) {
+                  result += ',' + (decimalPart !== undefined ? decimalPart : '');
+                }
+                return result;
+              })()}
+              onChange={(e) => {
+                let clean = e.target.value.replace(/\./g, '').replace(/,/g, '.');
+                // Keep only numbers and at most one dot
+                const dotCount = (clean.match(/\./g) || []).length;
+                if (dotCount > 1) {
+                  const firstDotIndex = clean.indexOf('.');
+                  clean = clean.slice(0, firstDotIndex + 1) + clean.slice(firstDotIndex + 1).replace(/\./g, '');
+                }
+                const parts = clean.split('.');
+                if (parts[1] && parts[1].length > 2) {
+                  clean = parts[0] + '.' + parts[1].slice(0, 2);
+                }
+                // Allow empty or partial/numeric inputs
+                if (clean === '' || clean === '.' || !isNaN(parseFloat(clean)) || (parts[0] !== undefined && !isNaN(Number(parts[0])))) {
+                  setTotalAmount(clean);
+                }
+              }}
               className="w-full glass-input pl-8 pr-3.5 py-3 rounded-xl text-sm font-semibold font-mono"
               placeholder="0,00"
               required
@@ -248,18 +572,27 @@ export default function NewBillForm({ onCalculate, initialFormValues }) {
         </div>
       )}
 
-      {/* Action Button */}
-      <button
-        type="submit"
-        disabled={billType === 'electricity' && !isRatioValid}
-        className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold shadow-lg transition-all border ${billType === 'electricity' && !isRatioValid
-          ? 'bg-neutral-100 dark:bg-neutral-900 text-neutral-400 dark:text-neutral-600 cursor-not-allowed border-neutral-200 dark:border-neutral-800'
-          : 'bg-neutral-950 hover:bg-neutral-850 text-white dark:bg-white dark:hover:bg-neutral-200 dark:text-neutral-950 border-transparent shadow-neutral-950/10'
-          }`}
-      >
-        <Calculator className="w-4.5 h-4.5" />
-        Hesapla ve Önizleme Oluştur
-      </button>
+      {/* Action Buttons */}
+      <div className="flex gap-3">
+        <button
+          type="button"
+          onClick={handleResetForm}
+          className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-3.5 bg-white hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800 border border-neutral-300 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 rounded-xl text-sm font-bold transition-all"
+        >
+          Formu Sıfırla
+        </button>
+        <button
+          type="submit"
+          disabled={billType === 'electricity' && !isRatioValid}
+          className={`flex-[2] sm:flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold shadow-lg transition-all border ${billType === 'electricity' && !isRatioValid
+            ? 'bg-neutral-100 dark:bg-neutral-900 text-neutral-400 dark:text-neutral-600 cursor-not-allowed border-neutral-200 dark:border-neutral-800'
+            : 'bg-neutral-950 hover:bg-neutral-850 text-white dark:bg-white dark:hover:bg-neutral-200 dark:text-neutral-950 border-transparent shadow-neutral-950/10'
+            }`}
+        >
+          <Calculator className="w-4.5 h-4.5" />
+          Hesapla ve Önizleme Oluştur
+        </button>
+      </div>
     </form>
   );
 }

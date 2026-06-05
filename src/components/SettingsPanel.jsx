@@ -4,6 +4,7 @@ import { Users, UserPlus, Save, RotateCcw, Trash2, Home } from 'lucide-react';
 export default function SettingsPanel({ residents, apartmentName, onSaveSettings, onResetResidents }) {
   const [localResidents, setLocalResidents] = useState([...residents]);
   const [localApartmentName, setLocalApartmentName] = useState(apartmentName || "Apartman");
+  const [newlyAddedId, setNewlyAddedId] = useState(null);
 
   useEffect(() => {
     setLocalApartmentName(apartmentName || "Apartman");
@@ -29,6 +30,7 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
 
   const handleAddResident = () => {
     const nextId = localResidents.length > 0 ? Math.max(...localResidents.map(r => r.id)) + 1 : 1;
+    setNewlyAddedId(nextId);
     setLocalResidents(prev => [
       ...prev,
       { id: nextId, name: `Yeni Daire ${nextId}`, count: 1 }
@@ -144,6 +146,8 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
                       <input
                         type="text"
                         value={res.name}
+                        autoFocus={res.id === newlyAddedId}
+                        onFocus={(e) => e.target.select()}
                         onChange={(e) => handleNameChange(res.id, e.target.value)}
                         className="w-full glass-input px-3.5 py-2.5 rounded-xl text-sm"
                         placeholder="Örn: Ahmet"
