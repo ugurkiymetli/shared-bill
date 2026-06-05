@@ -14,6 +14,7 @@ export default function NewBillForm({ onCalculate, initialFormValues }) {
   const [scanSuccess, setScanSuccess] = useState(false);
   const [fileName, setFileName] = useState('');
   const [fileUrl, setFileUrl] = useState('');
+  const [periodOptions, setPeriodOptions] = useState([]);
 
   // Electricity ratios state
   const [ratios, setRatios] = useState({ common: 10, fixed: 30, personal: 60 });
@@ -21,6 +22,21 @@ export default function NewBillForm({ onCalculate, initialFormValues }) {
 
   // Set default values based on current time (June 2026) or pre-fill if editing
   useEffect(() => {
+    // Generate period options: from currentMonth - 2 to December of current year
+    const now = new Date('2026-06-05T10:00:00+03:00');
+    const months = [
+      'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+      'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+    ];
+    const currentYear = now.getFullYear();
+    const currentMonthIdx = now.getMonth();
+    const options = [];
+    const startIdx = Math.max(0, currentMonthIdx - 2);
+    for (let m = startIdx; m <= 11; m++) {
+      options.push(`${months[m]} ${currentYear}`);
+    }
+    setPeriodOptions(options);
+
     if (initialFormValues) {
       setBillType(initialFormValues.type || 'electricity');
       setTotalAmount(initialFormValues.totalAmount || '');
@@ -31,16 +47,10 @@ export default function NewBillForm({ onCalculate, initialFormValues }) {
       }
     } else {
       // Default period: Current Turkish Month + Year (e.g. "Haziran 2026")
-      const now = new Date('2026-06-04T21:34:45+03:00');
-      const months = [
-        'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-        'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
-      ];
-      const currentMonth = months[now.getMonth()];
-      const currentYear = now.getFullYear();
+      const currentMonth = months[currentMonthIdx];
       setPeriod(`${currentMonth} ${currentYear}`);
 
-      // Default due date: 10 days from today (2026-06-14)
+      // Default due date: 10 days from today (2026-06-15)
       const defaultDue = new Date(now);
       defaultDue.setDate(now.getDate() + 10);
       const yyyy = defaultDue.getFullYear();
@@ -120,14 +130,14 @@ export default function NewBillForm({ onCalculate, initialFormValues }) {
     }
     setFileUrl('');
     
-    const now = new Date('2026-06-04T21:34:45+03:00');
+    const now = new Date('2026-06-05T10:00:00+03:00');
     const months = [
       'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
       'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
     ];
-    const currentMonth = months[now.getMonth()];
+    const currentMonthIdx = now.getMonth();
     const currentYear = now.getFullYear();
-    setPeriod(`${currentMonth} ${currentYear}`);
+    setPeriod(`${months[currentMonthIdx]} ${currentYear}`);
 
     const defaultDue = new Date(now);
     defaultDue.setDate(now.getDate() + 10);
@@ -283,8 +293,12 @@ export default function NewBillForm({ onCalculate, initialFormValues }) {
       if (dateToUse) {
         const m = dateToUse.dateObj.getMonth();
         const y = dateToUse.dateObj.getFullYear();
-        setPeriod(`${months[m]} ${y}`);
-        console.log("Selected Period:", `${months[m]} ${y}`);
+        const detectedPeriod = `${months[m]} ${y}`;
+        // Verify if the detected period is within options, otherwise fallback to first option
+        if (periodOptions.includes(detectedPeriod)) {
+          setPeriod(detectedPeriod);
+        }
+        console.log("Selected Period:", detectedPeriod);
       }
     }
     console.log("=== OCR SCAN END ===");
@@ -342,7 +356,6 @@ export default function NewBillForm({ onCalculate, initialFormValues }) {
             <input
               type="file"
               accept="image/*"
-              capture="environment"
               onChange={handleFileChange}
               disabled={isScanning}
               className="hidden"
@@ -405,6 +418,7 @@ export default function NewBillForm({ onCalculate, initialFormValues }) {
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-neutral-500 font-bold text-sm">₺</span>
             <input
               type="text"
+              inputMode="decimal"
               value={(() => {
                 if (!totalAmount) return '';
                 const parts = totalAmount.toString().split('.');
@@ -450,14 +464,17 @@ export default function NewBillForm({ onCalculate, initialFormValues }) {
             <Calendar className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500" />
             Fatura Dönemi
           </label>
-          <input
-            type="text"
+          <select
             value={period}
             onChange={(e) => setPeriod(e.target.value)}
             className="w-full glass-input px-3.5 py-3 rounded-xl text-sm"
-            placeholder="Örn: Haziran 2026"
-            required
-          />
+          >
+            {periodOptions.map((opt) => (
+              <option key={opt} value={opt} className="bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100">
+                {opt}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Due Date */}
@@ -470,7 +487,7 @@ export default function NewBillForm({ onCalculate, initialFormValues }) {
             type="date"
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
-            className="w-full glass-input px-3.5 py-3 rounded-xl text-sm font-mono"
+            className="w-full min-w-0 max-w-full glass-input px-3.5 py-3 rounded-xl text-sm font-mono box-border"
             required
           />
         </div>
@@ -573,24 +590,25 @@ export default function NewBillForm({ onCalculate, initialFormValues }) {
       )}
 
       {/* Action Buttons */}
-      <div className="flex gap-3">
+      <div className="flex flex-col sm:flex-row gap-3">
         <button
           type="button"
           onClick={handleResetForm}
-          className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-3.5 bg-white hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800 border border-neutral-300 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 rounded-xl text-sm font-bold transition-all"
+          className="w-full sm:w-auto px-5 py-3.5 bg-white hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800 border border-neutral-300 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 rounded-xl text-sm font-bold transition-all order-2 sm:order-1"
         >
           Formu Sıfırla
         </button>
         <button
           type="submit"
           disabled={billType === 'electricity' && !isRatioValid}
-          className={`flex-[2] sm:flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold shadow-lg transition-all border ${billType === 'electricity' && !isRatioValid
-            ? 'bg-neutral-100 dark:bg-neutral-900 text-neutral-400 dark:text-neutral-600 cursor-not-allowed border-neutral-200 dark:border-neutral-800'
-            : 'bg-neutral-950 hover:bg-neutral-850 text-white dark:bg-white dark:hover:bg-neutral-200 dark:text-neutral-950 border-transparent shadow-neutral-950/10'
-            }`}
+          className={`w-full sm:flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold shadow-lg transition-all border order-1 sm:order-2 ${
+            billType === 'electricity' && !isRatioValid
+              ? 'bg-neutral-100 dark:bg-neutral-900 text-neutral-400 dark:text-neutral-600 cursor-not-allowed border-neutral-200 dark:border-neutral-800'
+              : 'bg-neutral-950 hover:bg-neutral-850 text-white dark:bg-white dark:hover:bg-neutral-200 dark:text-neutral-950 border-transparent shadow-neutral-950/10'
+          }`}
         >
           <Calculator className="w-4.5 h-4.5" />
-          Hesapla ve Önizleme Oluştur
+          <span>Hesapla ve Önizleme Oluştur</span>
         </button>
       </div>
     </form>

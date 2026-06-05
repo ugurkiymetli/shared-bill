@@ -3,8 +3,11 @@ import React from 'react';
 export default function Footer() {
   return (
     <footer className="max-w-4xl mx-auto w-full px-4 text-center text-xs text-neutral-550 dark:text-neutral-600 border-t border-neutral-200 dark:border-neutral-900 pt-6 space-y-2">
-      <div className="flex items-center justify-center gap-2.5 font-mono text-[10px] text-neutral-500 dark:text-neutral-500">
+      <div className="flex items-center justify-center gap-1 font-mono text-[10px] text-neutral-500 dark:text-neutral-500">
         <span>built by ugur</span>
+      </div>
+      <div className="flex items-center justify-center gap-1 font-mono text-[10px] text-neutral-500 dark:text-neutral-500">
+
         <a
           href="https://github.com/ugurkiymetli"
           target="_blank"

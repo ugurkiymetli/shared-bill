@@ -5,6 +5,7 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
   const [localResidents, setLocalResidents] = useState([...residents]);
   const [localApartmentName, setLocalApartmentName] = useState(apartmentName || "Apartman");
   const [newlyAddedId, setNewlyAddedId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     setLocalApartmentName(apartmentName || "Apartman");
@@ -13,6 +14,19 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
   useEffect(() => {
     setLocalResidents([...residents]);
   }, [residents]);
+
+  // Scroll to newly added input on mobile/desktop
+  useEffect(() => {
+    if (newlyAddedId) {
+      const el = document.getElementById(`resident-name-${newlyAddedId}`);
+      if (el) {
+        // Scroll with a small timeout to let the input render first
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 80);
+      }
+    }
+  }, [newlyAddedId]);
 
   const handleCountChange = (id, val) => {
     const numVal = parseInt(val, 10);
@@ -38,7 +52,13 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
   };
 
   const handleDeleteResident = (id) => {
-    setLocalResidents(prev => prev.filter(r => r.id !== id));
+    setDeletingId(id);
+    // Let the fade-out / collapse animation play for 300ms before removing from DOM
+    setTimeout(() => {
+      setLocalResidents(prev => prev.filter(r => r.id !== id));
+      if (newlyAddedId === id) setNewlyAddedId(null);
+      setDeletingId(null);
+    }, 300);
   };
 
   const handleSubmit = (e) => {
@@ -115,87 +135,93 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
                 Kayıtlı sakin bulunmamaktadır. Yeni daire ekleyin.
               </div>
             ) : (
-              localResidents.map((res, index) => (
-                <div
-                  key={res.id}
-                  className="flex flex-col sm:grid sm:grid-cols-12 gap-3 sm:gap-4 px-5 py-4 sm:items-center hover:bg-neutral-100 dark:hover:bg-neutral-900/25 transition-colors"
-                >
-                  {/* Mobile Header: ID and Delete side-by-side */}
-                  <div className="flex sm:hidden justify-between items-center pb-2 border-b border-neutral-200 dark:border-neutral-800/60">
-                    <span className="text-xs font-bold text-neutral-500 dark:text-neutral-400 font-mono">Daire #{index + 1}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteResident(res.id)}
-                      className="text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300 p-1.5 rounded-lg transition-all"
-                      title="Daireyi Sil"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {/* Desktop ID column */}
-                  <div className="hidden sm:block sm:col-span-1 text-neutral-500 text-center text-xs font-mono font-bold">
-                    {index + 1}
-                  </div>
-
-                  {/* Input columns: side-by-side on mobile */}
-                  <div className="grid grid-cols-12 gap-3 sm:col-span-9 sm:contents">
-                    {/* Name input */}
-                    <div className="col-span-7 sm:col-span-6">
-                      <label className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 sm:hidden block mb-1">Daire Sakini</label>
-                      <input
-                        type="text"
-                        value={res.name}
-                        autoFocus={res.id === newlyAddedId}
-                        onFocus={(e) => e.target.select()}
-                        onChange={(e) => handleNameChange(res.id, e.target.value)}
-                        className="w-full glass-input px-3.5 py-2.5 rounded-xl text-sm"
-                        placeholder="Örn: Ahmet"
-                        required
-                      />
+              localResidents.map((res, index) => {
+                const isDeleting = res.id === deletingId;
+                return (
+                  <div
+                    key={res.id}
+                    className={`flex flex-col sm:grid sm:grid-cols-12 gap-3 sm:gap-4 px-5 py-4 sm:items-center hover:bg-neutral-100 dark:hover:bg-neutral-900/25 transition-all duration-300 ease-out ${
+                      isDeleting ? 'opacity-0 max-h-0 py-0 overflow-hidden border-b-0' : 'max-h-[200px] border-b border-neutral-200 dark:border-neutral-800/60'
+                    }`}
+                  >
+                    {/* Mobile Header: ID and Delete side-by-side */}
+                    <div className="flex sm:hidden justify-between items-center pb-2 border-b border-neutral-200 dark:border-neutral-800/60">
+                      <span className="text-xs font-bold text-neutral-500 dark:text-neutral-400 font-mono">Daire #{index + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteResident(res.id)}
+                        className="text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300 p-1.5 rounded-lg transition-all"
+                        title="Daireyi Sil"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
 
-                    {/* Count input */}
-                    <div className="col-span-5 sm:col-span-3">
-                      <label className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 sm:hidden block mb-1">Kişi Sayısı</label>
-                      <div className="flex items-center justify-between bg-neutral-100 dark:bg-neutral-950/40 rounded-xl border border-neutral-200 dark:border-neutral-800 px-1 py-0.5">
-                        <button
-                          type="button"
-                          onClick={() => handleCountChange(res.id, Math.max(0, res.count - 1))}
-                          className="w-7 h-7 flex items-center justify-center text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white text-base transition-colors"
-                        >
-                          -
-                        </button>
+                    {/* Desktop ID column */}
+                    <div className="hidden sm:block sm:col-span-1 text-neutral-500 text-center text-xs font-mono font-bold">
+                      {index + 1}
+                    </div>
+
+                    {/* Input columns: side-by-side on mobile */}
+                    <div className="grid grid-cols-12 gap-3 sm:col-span-9 sm:contents">
+                      {/* Name input */}
+                      <div className="col-span-7 sm:col-span-6">
+                        <label className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 sm:hidden block mb-1">Daire Sakini</label>
                         <input
-                          type="number"
-                          min="0"
-                          value={res.count}
-                          onChange={(e) => handleCountChange(res.id, e.target.value)}
-                          className="w-8 text-center bg-transparent border-0 focus:ring-0 text-sm font-bold text-neutral-950 dark:text-neutral-100 font-mono p-0"
+                          type="text"
+                          id={`resident-name-${res.id}`}
+                          value={res.name}
+                          autoFocus={res.id === newlyAddedId}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => handleNameChange(res.id, e.target.value)}
+                          className="w-full glass-input px-3.5 py-2.5 rounded-xl text-sm"
+                          placeholder="Örn: Ahmet"
+                          required
                         />
-                        <button
-                          type="button"
-                          onClick={() => handleCountChange(res.id, res.count + 1)}
-                          className="w-7 h-7 flex items-center justify-center text-neutral-550 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white text-base transition-colors"
-                        >
-                          +
-                        </button>
+                      </div>
+
+                      {/* Count input */}
+                      <div className="col-span-5 sm:col-span-3">
+                        <label className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 sm:hidden block mb-1">Kişi Sayısı</label>
+                        <div className="flex items-center justify-between bg-neutral-100 dark:bg-neutral-950/40 rounded-xl border border-neutral-200 dark:border-neutral-800 px-1 py-0.5">
+                          <button
+                            type="button"
+                            onClick={() => handleCountChange(res.id, Math.max(0, res.count - 1))}
+                            className="w-7 h-7 flex items-center justify-center text-neutral-550 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white text-base transition-colors"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min="0"
+                            value={res.count}
+                            onChange={(e) => handleCountChange(res.id, e.target.value)}
+                            className="w-8 text-center bg-transparent border-0 focus:ring-0 text-sm font-bold text-neutral-950 dark:text-neutral-100 font-mono p-0"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleCountChange(res.id, res.count + 1)}
+                            className="w-7 h-7 flex items-center justify-center text-neutral-550 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white text-base transition-colors"
+                          >
+                            +
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Desktop delete button column */}
-                  <div className="hidden sm:block sm:col-span-2 text-right">
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteResident(res.id)}
-                      className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:text-rose-300 dark:hover:bg-rose-950/20 p-2.5 rounded-xl transition-all inline-flex items-center gap-1 text-sm justify-center"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {/* Desktop delete button column */}
+                    <div className="hidden sm:block sm:col-span-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteResident(res.id)}
+                        className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:text-rose-300 dark:hover:bg-rose-950/20 p-2.5 rounded-xl transition-all inline-flex items-center gap-1 text-sm justify-center"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
