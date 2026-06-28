@@ -218,6 +218,7 @@ export default function App() {
             <NewBillForm
               onCalculate={handleCalculateBill}
               initialFormValues={initialFormValues}
+              residents={residents}
             />
 
             {activeBill && (

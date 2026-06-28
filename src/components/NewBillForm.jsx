@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Calculator, AlertCircle, ChevronDown, ChevronUp, RefreshCw, FileText, Calendar, DollarSign, Camera, Check, Paperclip, Eye, Trash2, Info } from 'lucide-react';
 import { createWorker } from 'tesseract.js';
 
-export default function NewBillForm({ onCalculate, initialFormValues }) {
+export default function NewBillForm({ onCalculate, initialFormValues, residents }) {
   const [billType, setBillType] = useState('electricity');
   const [totalAmount, setTotalAmount] = useState('');
   const [period, setPeriod] = useState('');
@@ -597,6 +597,35 @@ export default function NewBillForm({ onCalculate, initialFormValues }) {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Vacation Mode Information Banner */}
+      {residents && residents.some(r => r.isVacation) && (
+        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-850 dark:text-amber-300 text-xs space-y-2">
+          <div className="flex items-center gap-2 font-bold">
+            <Info className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <span>Tatil Modu Bilgilendirmesi</span>
+          </div>
+          <div className="space-y-1">
+            <p>
+              Şu sakinler tatil modundadır:{' '}
+              <strong className="text-amber-900 dark:text-amber-150 font-bold">
+                {residents.filter(r => r.isVacation).map(r => r.name).join(', ')}
+              </strong>
+            </p>
+            <ul className="list-disc list-inside space-y-0.5 opacity-90 pl-1">
+              {billType === 'water' && (
+                <li>Su faturasında bu kişilerin payları <strong>0 ₺</strong> olacaktır.</li>
+              )}
+              {billType === 'electricity' && (
+                <li>Elektrik faturasında ortak payı ödeyecekler, fakat sabit payları ve kişisel kullanım payları (kişi sayısı) <strong>0 ₺</strong> olarak hesaplanacaktır.</li>
+              )}
+              {billType === 'maintenance' && (
+                <li>Ortak gider faturasında eşit pay ödemeye devam edeceklerdir.</li>
+              )}
+            </ul>
+          </div>
         </div>
       )}
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, UserPlus, Save, RotateCcw, Trash2, Home } from 'lucide-react';
+import { Users, UserPlus, Save, RotateCcw, Trash2, Home, Palmtree } from 'lucide-react';
 
 export default function SettingsPanel({ residents, apartmentName, onSaveSettings, onResetResidents }) {
   const [localResidents, setLocalResidents] = useState([...residents]);
@@ -39,6 +39,12 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
   const handleNameChange = (id, val) => {
     setLocalResidents(prev =>
       prev.map(r => (r.id === id ? { ...r, name: val } : r))
+    );
+  };
+
+  const handleVacationToggle = (id) => {
+    setLocalResidents(prev =>
+      prev.map(r => (r.id === id ? { ...r, isVacation: !r.isVacation } : r))
     );
   };
 
@@ -124,9 +130,10 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
         <div className="bg-white dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800/80 rounded-2xl overflow-hidden shadow-lg dark:shadow-2xl">
           <div className="hidden sm:grid grid-cols-12 gap-4 px-6 py-3 bg-neutral-100 dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800 text-xs font-semibold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider">
             <div className="col-span-1 text-center">#</div>
-            <div className="col-span-6">Daire Sahibi / Sakini</div>
-            <div className="col-span-3 text-center">Kişi Sayısı</div>
-            <div className="col-span-2 text-right">İşlem</div>
+            <div className="col-span-5">Daire Sahibi / Sakini</div>
+            <div className="col-span-2 text-center">Kişi Sayısı</div>
+            <div className="col-span-2 text-center">Tatil Modu</div>
+            <div className="col-span-2 text-right pr-4">İşlem</div>
           </div>
 
           <div className="divide-y divide-neutral-200 dark:divide-neutral-800/60 max-h-[500px] overflow-y-auto">
@@ -144,17 +151,31 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
                       isDeleting ? 'opacity-0 max-h-0 py-0 overflow-hidden border-b-0' : 'max-h-[200px] border-b border-neutral-200 dark:border-neutral-800/60'
                     }`}
                   >
-                    {/* Mobile Header: ID and Delete side-by-side */}
+                    {/* Mobile Header: ID and Delete/Vacation side-by-side */}
                     <div className="flex sm:hidden justify-between items-center pb-2 border-b border-neutral-200 dark:border-neutral-800/60">
                       <span className="text-xs font-bold text-neutral-500 dark:text-neutral-400 font-mono">Daire #{index + 1}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteResident(res.id)}
-                        className="text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300 p-1.5 rounded-lg transition-all"
-                        title="Daireyi Sil"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => handleVacationToggle(res.id)}
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all border ${
+                            res.isVacation
+                              ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
+                              : 'bg-white dark:bg-neutral-900 border-neutral-300 dark:border-neutral-800 text-neutral-500'
+                          }`}
+                        >
+                          <Palmtree className={`w-3.5 h-3.5 ${res.isVacation ? 'animate-pulse' : ''}`} />
+                          <span>{res.isVacation ? 'Tatilde' : 'Aktif'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteResident(res.id)}
+                          className="text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300 p-1.5 rounded-lg transition-all"
+                          title="Daireyi Sil"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
 
                     {/* Desktop ID column */}
@@ -165,7 +186,7 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
                     {/* Input columns: side-by-side on mobile */}
                     <div className="grid grid-cols-12 gap-3 sm:col-span-9 sm:contents">
                       {/* Name input */}
-                      <div className="col-span-7 sm:col-span-6">
+                      <div className="col-span-7 sm:col-span-5">
                         <label className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 sm:hidden block mb-1">Daire Sakini</label>
                         <input
                           type="text"
@@ -181,7 +202,7 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
                       </div>
 
                       {/* Count input */}
-                      <div className="col-span-5 sm:col-span-3">
+                      <div className="col-span-5 sm:col-span-2">
                         <label className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 sm:hidden block mb-1">Kişi Sayısı</label>
                         <div className="flex items-center justify-between bg-neutral-100 dark:bg-neutral-950/40 rounded-xl border border-neutral-200 dark:border-neutral-800 px-1 py-0.5">
                           <button
@@ -206,6 +227,22 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
                             +
                           </button>
                         </div>
+                      </div>
+
+                      {/* Vacation toggle input (desktop only) */}
+                      <div className="hidden sm:flex sm:col-span-2 justify-center">
+                        <button
+                          type="button"
+                          onClick={() => handleVacationToggle(res.id)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                            res.isVacation
+                              ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
+                              : 'bg-white hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800 border-neutral-300 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400'
+                          }`}
+                        >
+                          <Palmtree className={`w-3.5 h-3.5 ${res.isVacation ? 'animate-bounce' : ''}`} />
+                          <span>{res.isVacation ? 'Tatilde' : 'Aktif'}</span>
+                        </button>
                       </div>
                     </div>
 

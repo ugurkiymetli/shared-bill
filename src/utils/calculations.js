@@ -6,19 +6,34 @@
  * Split Water Bill (Su Faturası)
  * Formula: (Total Amount / Total Residents) * Apartment Residents count
  */
+/**
+ * Split Water Bill (Su Faturası)
+ * Formula: (Total Amount / Total Residents) * Apartment Residents count (vacation shares are 0)
+ */
 export function calculateWater(totalAmount, residents) {
-  const totalCount = residents.reduce((sum, res) => sum + Number(res.count), 0);
+  const activeResidents = residents.filter(r => !r.isVacation);
+  const totalCount = activeResidents.reduce((sum, res) => sum + Number(res.count), 0);
   
-  if (totalCount === 0) return residents.map(r => ({ ...r, share: 0, breakdown: {} }));
-
   return residents.map(res => {
+    if (res.isVacation || totalCount === 0) {
+      return {
+        ...res,
+        share: 0,
+        breakdown: {
+          residentsCount: 0,
+          perResident: 0,
+          isVacation: true
+        }
+      };
+    }
     const share = (totalAmount / totalCount) * Number(res.count);
     return {
       ...res,
       share: Math.round(share * 100) / 100,
       breakdown: {
         residentsCount: res.count,
-        perResident: Math.round((totalAmount / totalCount) * 100) / 100
+        perResident: Math.round((totalAmount / totalCount) * 100) / 100,
+        isVacation: false
       }
     };
   });
@@ -27,15 +42,15 @@ export function calculateWater(totalAmount, residents) {
 /**
  * Split Electricity Bill (Elektrik Faturası V2)
  * Formula:
- * - Common Pool (e.g. 10%): Divided equally among the 9 apartments
- * - Fixed Pool (e.g. 30%): Divided equally among the 9 apartments
- * - Personal Pool (e.g. 60%): Divided proportionally based on resident counts
- * 
- * Ratios are customizable but should default to 10%, 30%, 60% (ratios: { common: 10, fixed: 30, personal: 60 })
+ * - Common Pool (e.g. 10%): Divided equally among all apartments
+ * - Fixed Pool (e.g. 30%): Divided equally among all apartments
+ * - Personal Pool (e.g. 60%): Divided proportionally based on active resident counts
  */
 export function calculateElectricity(totalAmount, residents, ratios = { common: 10, fixed: 30, personal: 60 }) {
   const numApartments = residents.length || 9;
-  const totalResidents = residents.reduce((sum, res) => sum + Number(res.count), 0);
+  const activeResidents = residents.filter(r => !r.isVacation);
+  const numActiveApartments = activeResidents.length;
+  const totalResidents = activeResidents.reduce((sum, res) => sum + Number(res.count), 0);
   
   const commonFraction = ratios.common / 100;
   const fixedFraction = ratios.fixed / 100;
@@ -46,23 +61,25 @@ export function calculateElectricity(totalAmount, residents, ratios = { common: 
   const personalPool = totalAmount * personalFraction;
 
   const commonSharePerApartment = commonPool / numApartments;
-  const fixedSharePerApartment = fixedPool / numApartments;
+  const fixedSharePerActiveApartment = numActiveApartments > 0 ? fixedPool / numActiveApartments : 0;
 
   return residents.map(res => {
-    const personalShare = totalResidents > 0 
+    const fixedShare = !res.isVacation ? fixedSharePerActiveApartment : 0;
+    const personalShare = (!res.isVacation && totalResidents > 0)
       ? (personalPool / totalResidents) * Number(res.count)
       : 0;
     
-    const totalShare = commonSharePerApartment + fixedSharePerApartment + personalShare;
+    const totalShare = commonSharePerApartment + fixedShare + personalShare;
 
     return {
       ...res,
       share: Math.round(totalShare * 100) / 100,
       breakdown: {
         commonShare: Math.round(commonSharePerApartment * 100) / 100,
-        fixedShare: Math.round(fixedSharePerApartment * 100) / 100,
+        fixedShare: Math.round(fixedShare * 100) / 100,
         personalShare: Math.round(personalShare * 100) / 100,
-        residentsCount: res.count
+        residentsCount: res.isVacation ? 0 : res.count,
+        isVacation: !!res.isVacation
       }
     };
   });
@@ -70,7 +87,7 @@ export function calculateElectricity(totalAmount, residents, ratios = { common: 
 
 /**
  * Split General Maintenance (Ortak Gider)
- * Formula: Divided equally among all 9 apartments
+ * Formula: Divided equally among all apartments
  */
 export function calculateMaintenance(totalAmount, residents) {
   const numApartments = residents.length || 9;
@@ -81,7 +98,8 @@ export function calculateMaintenance(totalAmount, residents) {
       ...res,
       share: Math.round(share * 100) / 100,
       breakdown: {
-        perApartment: Math.round(share * 100) / 100
+        perApartment: Math.round(share * 100) / 100,
+        isVacation: !!res.isVacation
       }
     };
   });

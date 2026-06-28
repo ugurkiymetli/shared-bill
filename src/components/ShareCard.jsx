@@ -43,7 +43,8 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
     text += `Son Ödeme Tarihi: ${formatDate(bill.dueDate)}\n`;
     text += `----------------------------\n`;
     bill.splits.forEach(item => {
-      text += `• ${item.name} (${item.count} Kişi): ₺${formatCurrency(item.share)}\n`;
+      const vacationLabel = item.isVacation ? ' [Tatil]' : '';
+      text += `• ${item.name}${vacationLabel} (${item.count} Kişi): ₺${formatCurrency(item.share)}\n`;
       if (bill.type === 'electricity' && showDetails && item.breakdown) {
         const bd = item.breakdown;
         text += `  (Ortak: ₺${formatCurrency(bd.commonShare)} | Sabit: ₺${formatCurrency(bd.fixedShare)} | Kişisel: ₺${formatCurrency(bd.personalShare)})\n`;
@@ -53,8 +54,9 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
     if (bill.type === 'electricity') {
       text += `Rasyolar: %${bill.ratios?.common || 10} Ortak | %${bill.ratios?.fixed || 30} Sabit | %${bill.ratios?.personal || 60} Kişisel\n`;
     } else if (bill.type === 'water') {
-      const totalCount = bill.splits.reduce((s, i) => s + i.count, 0);
-      text += `Kişi Başı Su Ücreti: ₺${formatCurrency(bill.totalAmount / totalCount)}\n`;
+      const activeSplits = bill.splits.filter(s => !s.isVacation);
+      const totalCount = activeSplits.reduce((s, i) => s + i.count, 0);
+      text += `Kişi Başı Su Ücreti (Aktifler): ₺${formatCurrency(totalCount > 0 ? (bill.totalAmount / totalCount) : 0)}\n`;
     }
     navigator.clipboard.writeText(text)
       .then(() => {
@@ -168,16 +170,18 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
         const rowBG = idx % 2 === 0 ? EVEN_BG : ODD_BG;
         rect(tableLeft, cy, tableW, ROW_H, rowBG);
 
+        const displayName = item.isVacation ? `${item.name} (Tatil)` : item.name;
+
         const values = showElecDetail
           ? [
-              item.name,
+              displayName,
               item.count,
               `₺${formatCurrency(item.breakdown?.commonShare || 0)}`,
               `₺${formatCurrency(item.breakdown?.fixedShare || 0)}`,
               `₺${formatCurrency(item.breakdown?.personalShare || 0)}`,
               `₺${formatCurrency(item.share)}`
             ]
-          : [item.name, item.count, `₺${formatCurrency(item.share)}`];
+          : [displayName, item.count, `₺${formatCurrency(item.share)}`];
 
         cx = tableLeft;
         values.forEach((val, i) => {
@@ -314,7 +318,7 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
       </div>
 
       {/* Preview card (UI only, not used for export) */}
-      <div className="overflow-x-auto rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-xl dark:shadow-2xl">
+      <div className="overflow-x-auto rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-xl dark:shadow-2xl mb-2">
         <div
           id="share-card"
           ref={cardRef}
@@ -356,7 +360,14 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
                       {idx + 1}
                     </div>
                     <div>
-                      <span className="font-bold text-neutral-900 dark:text-neutral-200 text-sm block">{item.name}</span>
+                      <span className="font-bold text-neutral-900 dark:text-neutral-200 text-sm flex items-center gap-1.5">
+                        {item.name}
+                        {item.isVacation && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-[9px] font-bold text-amber-600 dark:text-amber-400 font-sans uppercase">
+                            Tatil
+                          </span>
+                        )}
+                      </span>
                       <span className="text-[10px] text-neutral-500 dark:text-neutral-500 block font-medium">
                         {item.count} Kişi {bill.type === 'electricity' && showDetails && item.breakdown && (
                           <span>• Ortak: ₺{formatCurrency(item.breakdown.commonShare)} | Sabit: ₺{formatCurrency(item.breakdown.fixedShare)} | Kişisel: ₺{formatCurrency(item.breakdown.personalShare)}</span>
@@ -394,7 +405,16 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
                   {bill.splits.map((item, idx) => (
                     <tr key={item.id || idx} className="hover:bg-neutral-100 dark:hover:bg-neutral-900/30">
                       <td className="p-3 border-r border-neutral-200 dark:border-neutral-800 text-center text-neutral-400 dark:text-neutral-500 font-bold">{idx + 1}</td>
-                      <td className="p-3 border-r border-neutral-200 dark:border-neutral-800 font-sans font-bold text-neutral-900 dark:text-neutral-200">{item.name}</td>
+                      <td className="p-3 border-r border-neutral-200 dark:border-neutral-800 font-sans font-bold text-neutral-900 dark:text-neutral-200">
+                        <div className="flex items-center gap-2">
+                          <span>{item.name}</span>
+                          {item.isVacation && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-[9px] font-bold text-amber-600 dark:text-amber-400 font-sans uppercase">
+                              Tatil
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="p-3 border-r border-neutral-200 dark:border-neutral-800 text-center">{item.count}</td>
                       {bill.type === 'electricity' && showDetails && item.breakdown ? (
                         <>
