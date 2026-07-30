@@ -43,7 +43,13 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
     text += `Son Ödeme Tarihi: ${formatDate(bill.dueDate)}\n`;
     text += `----------------------------\n`;
     bill.splits.forEach(item => {
-      const vacationLabel = item.isVacation ? ' [Tatil]' : '';
+      const days = item.stayDays !== undefined ? item.stayDays : (item.isVacation ? 0 : 30);
+      let vacationLabel = '';
+      if (days === 0) {
+        vacationLabel = ' [Tatil]';
+      } else if (days < 30) {
+        vacationLabel = ` [${days} Gün]`;
+      }
       text += `• ${item.name}${vacationLabel} (${item.count} Kişi): ₺${formatCurrency(item.share)}\n`;
       if (bill.type === 'electricity' && showDetails && item.breakdown) {
         const bd = item.breakdown;
@@ -170,7 +176,10 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
         const rowBG = idx % 2 === 0 ? EVEN_BG : ODD_BG;
         rect(tableLeft, cy, tableW, ROW_H, rowBG);
 
-        const displayName = item.isVacation ? `${item.name} (Tatil)` : item.name;
+        const days = item.stayDays !== undefined ? item.stayDays : (item.isVacation ? 0 : 30);
+        const displayName = days === 0
+          ? `${item.name} (Tatil)`
+          : (days < 30 ? `${item.name} (${days}G)` : item.name);
 
         const values = showElecDetail
           ? [
@@ -362,11 +371,23 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
                     <div>
                       <span className="font-bold text-neutral-900 dark:text-neutral-200 text-sm flex items-center gap-1.5">
                         {item.name}
-                        {item.isVacation && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-[9px] font-bold text-amber-600 dark:text-amber-400 font-sans uppercase">
-                            Tatil
-                          </span>
-                        )}
+                        {(() => {
+                          const days = item.stayDays !== undefined ? item.stayDays : (item.isVacation ? 0 : 30);
+                          if (days === 0) {
+                            return (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-[9px] font-bold text-amber-600 dark:text-amber-400 font-sans uppercase font-outfit">
+                                Tatil
+                              </span>
+                            );
+                          } else if (days < 30) {
+                            return (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-[9px] font-bold text-blue-600 dark:text-blue-400 font-sans uppercase font-outfit">
+                                {days} Gün
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
                       </span>
                       <span className="text-[10px] text-neutral-500 dark:text-neutral-500 block font-medium">
                         {item.count} Kişi {bill.type === 'electricity' && showDetails && item.breakdown && (
@@ -408,11 +429,23 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
                       <td className="p-3 border-r border-neutral-200 dark:border-neutral-800 font-sans font-bold text-neutral-900 dark:text-neutral-200">
                         <div className="flex items-center gap-2">
                           <span>{item.name}</span>
-                          {item.isVacation && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-[9px] font-bold text-amber-600 dark:text-amber-400 font-sans uppercase">
-                              Tatil
-                            </span>
-                          )}
+                          {(() => {
+                            const days = item.stayDays !== undefined ? item.stayDays : (item.isVacation ? 0 : 30);
+                            if (days === 0) {
+                              return (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-[9px] font-bold text-amber-600 dark:text-amber-400 font-sans uppercase font-outfit">
+                                  Tatil
+                                </span>
+                              );
+                            } else if (days < 30) {
+                              return (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-[9px] font-bold text-blue-600 dark:text-blue-400 font-sans uppercase font-outfit">
+                                  {days} Gün
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                       </td>
                       <td className="p-3 border-r border-neutral-200 dark:border-neutral-800 text-center">{item.count}</td>

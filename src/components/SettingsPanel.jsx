@@ -44,7 +44,25 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
 
   const handleVacationToggle = (id) => {
     setLocalResidents(prev =>
-      prev.map(r => (r.id === id ? { ...r, isVacation: !r.isVacation } : r))
+      prev.map(r => {
+        if (r.id === id) {
+          const currentlyVacation = r.stayDays === 0 || (r.stayDays === undefined && r.isVacation);
+          return {
+            ...r,
+            stayDays: currentlyVacation ? 30 : 0,
+            isVacation: !currentlyVacation
+          };
+        }
+        return r;
+      })
+    );
+  };
+
+  const handleStayDaysChange = (id, val) => {
+    const numVal = parseInt(val, 10);
+    const cleanVal = isNaN(numVal) ? 0 : Math.max(0, Math.min(30, numVal));
+    setLocalResidents(prev =>
+      prev.map(r => (r.id === id ? { ...r, stayDays: cleanVal, isVacation: cleanVal === 0 } : r))
     );
   };
 
@@ -53,7 +71,7 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
     setNewlyAddedId(nextId);
     setLocalResidents(prev => [
       ...prev,
-      { id: nextId, name: `Yeni Daire ${nextId}`, count: 1 }
+      { id: nextId, name: `Yeni Daire ${nextId}`, count: 1, stayDays: 30, isVacation: false }
     ]);
   };
 
@@ -130,9 +148,9 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
         <div className="bg-white dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800/80 rounded-2xl overflow-hidden shadow-lg dark:shadow-2xl">
           <div className="hidden sm:grid grid-cols-12 gap-4 px-6 py-3 bg-neutral-100 dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800 text-xs font-semibold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider">
             <div className="col-span-1 text-center">#</div>
-            <div className="col-span-5">Daire Sahibi / Sakini</div>
+            <div className="col-span-4">Daire Sahibi / Sakini</div>
             <div className="col-span-2 text-center">Kişi Sayısı</div>
-            <div className="col-span-2 text-center">Tatil Modu</div>
+            <div className="col-span-3 text-center">Aktif Gün (Maks 30)</div>
             <div className="col-span-2 text-right pr-4">İşlem</div>
           </div>
 
@@ -144,6 +162,7 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
             ) : (
               localResidents.map((res, index) => {
                 const isDeleting = res.id === deletingId;
+                const isVacationActive = res.stayDays === 0 || (res.stayDays === undefined && res.isVacation);
                 return (
                   <div
                     key={res.id}
@@ -159,13 +178,13 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
                           type="button"
                           onClick={() => handleVacationToggle(res.id)}
                           className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all border ${
-                            res.isVacation
+                            isVacationActive
                               ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
                               : 'bg-white dark:bg-neutral-900 border-neutral-300 dark:border-neutral-800 text-neutral-500'
                           }`}
                         >
-                          <Palmtree className={`w-3.5 h-3.5 ${res.isVacation ? 'animate-pulse' : ''}`} />
-                          <span>{res.isVacation ? 'Tatilde' : 'Aktif'}</span>
+                          <Palmtree className={`w-3.5 h-3.5 ${isVacationActive ? 'animate-pulse' : ''}`} />
+                          <span>{isVacationActive ? 'Tatilde' : 'Aktif'}</span>
                         </button>
                         <button
                           type="button"
@@ -186,7 +205,7 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
                     {/* Input columns: side-by-side on mobile */}
                     <div className="grid grid-cols-12 gap-3 sm:col-span-9 sm:contents">
                       {/* Name input */}
-                      <div className="col-span-7 sm:col-span-5">
+                      <div className="col-span-6 sm:col-span-4">
                         <label className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 sm:hidden block mb-1">Daire Sakini</label>
                         <input
                           type="text"
@@ -202,7 +221,7 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
                       </div>
 
                       {/* Count input */}
-                      <div className="col-span-5 sm:col-span-2">
+                      <div className="col-span-3 sm:col-span-2">
                         <label className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 sm:hidden block mb-1">Kişi Sayısı</label>
                         <div className="flex items-center justify-between bg-neutral-100 dark:bg-neutral-950/40 rounded-xl border border-neutral-200 dark:border-neutral-800 px-1 py-0.5">
                           <button
@@ -229,20 +248,33 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
                         </div>
                       </div>
 
-                      {/* Vacation toggle input (desktop only) */}
-                      <div className="hidden sm:flex sm:col-span-2 justify-center">
-                        <button
-                          type="button"
-                          onClick={() => handleVacationToggle(res.id)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
-                            res.isVacation
-                              ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
-                              : 'bg-white hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800 border-neutral-300 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400'
-                          }`}
-                        >
-                          <Palmtree className={`w-3.5 h-3.5 ${res.isVacation ? 'animate-bounce' : ''}`} />
-                          <span>{res.isVacation ? 'Tatilde' : 'Aktif'}</span>
-                        </button>
+                      {/* Stay Days input */}
+                      <div className="col-span-3 sm:col-span-3 flex items-center justify-center gap-2">
+                        <div className="w-full">
+                          <label className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 sm:hidden block mb-1">Aktif Gün</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="30"
+                            value={res.stayDays !== undefined ? res.stayDays : (res.isVacation ? 0 : 30)}
+                            onChange={(e) => handleStayDaysChange(res.id, e.target.value)}
+                            className="w-full text-center glass-input px-2 py-2.5 rounded-xl text-sm font-bold font-mono"
+                          />
+                        </div>
+                        <div className="hidden sm:block mt-0 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleVacationToggle(res.id)}
+                            className={`p-2.5 rounded-xl border transition-all ${
+                              isVacationActive
+                                ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400 font-bold'
+                                : 'bg-white hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800 border-neutral-300 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400'
+                            }`}
+                            title="Tatile Çıkar (0 Gün)"
+                          >
+                            <Palmtree className={`w-4 h-4 ${isVacationActive ? 'animate-bounce' : ''}`} />
+                          </button>
+                        </div>
                       </div>
                     </div>
 
