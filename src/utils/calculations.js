@@ -1,32 +1,82 @@
 /**
- * Calculation helper functions for Apartment Bill Splitter
+ * Computes weight, personDays, summaryText, and active status for a resident
  */
+export function getResidentWeight(r) {
+  if (r.entryMode === 'detailed' && Array.isArray(r.periods) && r.periods.length > 0) {
+    const personDays = r.periods.reduce((sum, p) => {
+      const days = Number(p.days) || 0;
+      const count = Number(p.count) || 0;
+      return sum + (days * count);
+    }, 0);
+    const totalDays = r.periods.reduce((sum, p) => sum + (Number(p.days) || 0), 0);
+    const weight = personDays / 30; // normalized to 30 days
+    const summaryText = r.periods.map(p => `${p.days}g x ${p.count}k`).join(' + ');
+    const avgCount = (personDays / 30).toFixed(1).replace('.0', '');
+
+    return {
+      weight,
+      personDays,
+      totalDays,
+      entryMode: 'detailed',
+      isActive: personDays > 0,
+      summaryText,
+      avgCount,
+      isVacation: personDays === 0
+    };
+  }
+
+  // Simple mode
+  const days = r.stayDays !== undefined ? r.stayDays : (r.isVacation ? 0 : 30);
+  const count = Number(r.count) || 0;
+  const personDays = days * count;
+  const weight = (count * days) / 30;
+  
+  let summaryText = `${count} Kişi`;
+  if (days === 0 || r.isVacation) {
+    summaryText = 'Tatil';
+  } else if (days < 30) {
+    summaryText = `${count}k (${days}g)`;
+  }
+
+  return {
+    weight,
+    personDays,
+    totalDays: days,
+    entryMode: 'simple',
+    isActive: weight > 0,
+    summaryText,
+    avgCount: count.toString(),
+    isVacation: days === 0 || !!r.isVacation
+  };
+}
 
 /**
  * Split Water Bill (Su Faturası)
- * Formula: (Total Amount / Total Residents) * Apartment Residents count
+ * Formula: (Total Amount / Total Weights) * Apartment Weight
  */
 export function calculateWater(totalAmount, residents) {
-  const weights = residents.map(r => {
-    const days = r.stayDays !== undefined ? r.stayDays : (r.isVacation ? 0 : 30);
+  const parsedResidents = residents.map(r => {
+    const info = getResidentWeight(r);
     return {
       ...r,
-      weight: Number(r.count) * (days / 30),
-      days
+      ...info
     };
   });
-  const totalWeight = weights.reduce((sum, res) => sum + res.weight, 0);
+
+  const totalWeight = parsedResidents.reduce((sum, res) => sum + res.weight, 0);
   
-  return weights.map(res => {
-    if (totalWeight === 0) {
+  return parsedResidents.map(res => {
+    if (totalWeight === 0 || !res.isActive) {
       return {
         ...res,
         share: 0,
         breakdown: {
           residentsCount: 0,
           perResident: 0,
-          isVacation: res.days === 0,
-          stayDays: res.days
+          isVacation: !res.isActive,
+          summaryText: res.summaryText,
+          personDays: res.personDays,
+          entryMode: res.entryMode
         }
       };
     }
@@ -35,10 +85,12 @@ export function calculateWater(totalAmount, residents) {
       ...res,
       share: Math.round(share * 100) / 100,
       breakdown: {
-        residentsCount: res.count,
+        residentsCount: res.avgCount,
         perResident: Math.round((totalAmount / totalWeight) * 100) / 100,
-        isVacation: res.days === 0,
-        stayDays: res.days
+        isVacation: !res.isActive,
+        summaryText: res.summaryText,
+        personDays: res.personDays,
+        entryMode: res.entryMode
       }
     };
   });
@@ -48,19 +100,17 @@ export function calculateWater(totalAmount, residents) {
  * Split Electricity Bill (Elektrik Faturası V2)
  * Formula:
  * - Common Pool (e.g. 10%): Divided equally among all apartments
- * - Fixed Pool (e.g. 30%): Divided equally among active apartments (stayDays > 0)
- * - Personal Pool (e.g. 60%): Divided proportionally based on stayDays count weight (count * stayDays / 30)
+ * - Fixed Pool (e.g. 30%): Divided equally among active apartments (weight > 0)
+ * - Personal Pool (e.g. 60%): Divided proportionally based on stayDays & period weight
  */
 export function calculateElectricity(totalAmount, residents, ratios = { common: 10, fixed: 30, personal: 60 }) {
   const numApartments = residents.length || 9;
   
   const parsedResidents = residents.map(r => {
-    const days = r.stayDays !== undefined ? r.stayDays : (r.isVacation ? 0 : 30);
+    const info = getResidentWeight(r);
     return {
       ...r,
-      days,
-      isActive: days > 0,
-      weight: Number(r.count) * (days / 30)
+      ...info
     };
   });
 
@@ -94,9 +144,11 @@ export function calculateElectricity(totalAmount, residents, ratios = { common: 
         commonShare: Math.round(commonSharePerApartment * 100) / 100,
         fixedShare: Math.round(fixedShare * 100) / 100,
         personalShare: Math.round(personalShare * 100) / 100,
-        residentsCount: res.days === 0 ? 0 : res.count,
-        isVacation: res.days === 0,
-        stayDays: res.days
+        residentsCount: res.isActive ? res.avgCount : 0,
+        isVacation: !res.isActive,
+        summaryText: res.summaryText,
+        personDays: res.personDays,
+        entryMode: res.entryMode
       }
     };
   });
@@ -111,12 +163,14 @@ export function calculateMaintenance(totalAmount, residents) {
   const share = totalAmount / numApartments;
 
   return residents.map(res => {
+    const info = getResidentWeight(res);
     return {
       ...res,
       share: Math.round(share * 100) / 100,
       breakdown: {
         perApartment: Math.round(share * 100) / 100,
-        isVacation: !!res.isVacation
+        isVacation: !info.isActive,
+        summaryText: info.summaryText
       }
     };
   });

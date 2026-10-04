@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Users, UserPlus, Save, RotateCcw, Trash2, Home, Palmtree } from 'lucide-react';
+import { Users, UserPlus, Save, RotateCcw, Trash2, Home, Palmtree, Calendar, Layers } from 'lucide-react';
+import DetailedPeriodModal from './DetailedPeriodModal';
+import { getResidentWeight } from '../utils/calculations';
 
 export default function SettingsPanel({ residents, apartmentName, onSaveSettings, onResetResidents }) {
   const [localResidents, setLocalResidents] = useState([...residents]);
   const [localApartmentName, setLocalApartmentName] = useState(apartmentName || "Apartman");
   const [newlyAddedId, setNewlyAddedId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [activeModalResident, setActiveModalResident] = useState(null);
 
   useEffect(() => {
     setLocalApartmentName(apartmentName || "Apartman");
@@ -63,6 +66,19 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
     const cleanVal = isNaN(numVal) ? 0 : Math.max(0, Math.min(30, numVal));
     setLocalResidents(prev =>
       prev.map(r => (r.id === id ? { ...r, stayDays: cleanVal, isVacation: cleanVal === 0 } : r))
+    );
+  };
+
+  const handleSaveDetailedPeriods = (updatedResident) => {
+    setLocalResidents(prev =>
+      prev.map(r => r.id === updatedResident.id ? updatedResident : r)
+    );
+    setActiveModalResident(null);
+  };
+
+  const handleSwitchToSimple = (id) => {
+    setLocalResidents(prev =>
+      prev.map(r => r.id === id ? { ...r, entryMode: 'simple' } : r)
     );
   };
 
@@ -149,8 +165,7 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
           <div className="hidden sm:grid grid-cols-12 gap-4 px-6 py-3 bg-neutral-100 dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800 text-xs font-semibold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider">
             <div className="col-span-1 text-center">#</div>
             <div className="col-span-4">Daire Sahibi / Sakini</div>
-            <div className="col-span-2 text-center">Kişi Sayısı</div>
-            <div className="col-span-3 text-center">Aktif Gün (Maks 30)</div>
+            <div className="col-span-5 text-center">Kişi & Dönem Modu</div>
             <div className="col-span-2 text-right pr-4">İşlem</div>
           </div>
 
@@ -163,6 +178,8 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
               localResidents.map((res, index) => {
                 const isDeleting = res.id === deletingId;
                 const isVacationActive = res.stayDays === 0 || (res.stayDays === undefined && res.isVacation);
+                const weightInfo = getResidentWeight(res);
+
                 return (
                   <div
                     key={res.id}
@@ -173,7 +190,7 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
                     {/* Mobile Header: ID and Delete/Vacation side-by-side */}
                     <div className="flex sm:hidden justify-between items-center pb-2 border-b border-neutral-200 dark:border-neutral-800/60">
                       <span className="text-xs font-bold text-neutral-500 dark:text-neutral-400 font-mono">Daire #{index + 1}</span>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => handleVacationToggle(res.id)}
@@ -202,10 +219,10 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
                       {index + 1}
                     </div>
 
-                    {/* Input columns: side-by-side on mobile */}
+                    {/* Input columns */}
                     <div className="grid grid-cols-12 gap-3 sm:col-span-9 sm:contents">
                       {/* Name input */}
-                      <div className="col-span-6 sm:col-span-4">
+                      <div className="col-span-12 sm:col-span-4">
                         <label className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 sm:hidden block mb-1">Daire Sakini</label>
                         <input
                           type="text"
@@ -220,61 +237,100 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
                         />
                       </div>
 
-                      {/* Count input */}
-                      <div className="col-span-3 sm:col-span-2">
-                        <label className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 sm:hidden block mb-1">Kişi Sayısı</label>
-                        <div className="flex items-center justify-between bg-neutral-100 dark:bg-neutral-950/40 rounded-xl border border-neutral-200 dark:border-neutral-800 px-1 py-0.5">
-                          <button
-                            type="button"
-                            onClick={() => handleCountChange(res.id, Math.max(0, res.count - 1))}
-                            className="w-7 h-7 flex items-center justify-center text-neutral-550 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white text-base transition-colors"
-                          >
-                            -
-                          </button>
-                          <input
-                            type="number"
-                            min="0"
-                            value={res.count}
-                            onChange={(e) => handleCountChange(res.id, e.target.value)}
-                            className="w-8 text-center bg-transparent border-0 focus:ring-0 text-sm font-bold text-neutral-950 dark:text-neutral-100 font-mono p-0"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleCountChange(res.id, res.count + 1)}
-                            className="w-7 h-7 flex items-center justify-center text-neutral-550 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white text-base transition-colors"
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
+                      {/* Kişi & Dönem Modu Controls */}
+                      <div className="col-span-12 sm:col-span-5 flex flex-col justify-center gap-1.5">
+                        {res.entryMode === 'detailed' ? (
+                          <div className="flex flex-wrap items-center justify-between sm:justify-center gap-2 p-2 rounded-xl bg-neutral-100 dark:bg-neutral-950/60 border border-neutral-200 dark:border-neutral-800">
+                            <span className="px-2.5 py-1 rounded-lg bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-950 font-mono text-xs font-bold truncate max-w-[180px]" title={weightInfo.summaryText}>
+                              {weightInfo.summaryText}
+                            </span>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => setActiveModalResident(res)}
+                                className="px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 dark:bg-neutral-200 dark:hover:bg-white text-white dark:text-neutral-950 text-xs font-bold transition-all shadow-sm flex items-center gap-1"
+                              >
+                                <Calendar className="w-3.5 h-3.5" />
+                                <span>Düzenle</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSwitchToSimple(res.id)}
+                                className="px-1.5 py-1 text-[10px] font-semibold text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-200 underline"
+                              >
+                                Basit
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            {/* Count input */}
+                            <div className="flex-1">
+                              <label className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 sm:hidden block mb-1">Kişi</label>
+                              <div className="flex items-center justify-between bg-neutral-100 dark:bg-neutral-950/40 rounded-xl border border-neutral-200 dark:border-neutral-800 px-1 py-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleCountChange(res.id, Math.max(0, res.count - 1))}
+                                  className="w-6 h-6 flex items-center justify-center text-neutral-550 dark:text-neutral-400 text-sm"
+                                >
+                                  -
+                                </button>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={res.count}
+                                  onChange={(e) => handleCountChange(res.id, e.target.value)}
+                                  className="w-7 text-center bg-transparent border-0 focus:ring-0 text-xs font-bold font-mono p-0"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleCountChange(res.id, res.count + 1)}
+                                  className="w-6 h-6 flex items-center justify-center text-neutral-550 dark:text-neutral-400 text-sm"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
 
-                      {/* Stay Days input */}
-                      <div className="col-span-3 sm:col-span-3 flex items-center justify-center gap-2">
-                        <div className="w-full">
-                          <label className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 sm:hidden block mb-1">Aktif Gün</label>
-                          <input
-                            type="number"
-                            min="0"
-                            max="30"
-                            value={res.stayDays !== undefined ? res.stayDays : (res.isVacation ? 0 : 30)}
-                            onChange={(e) => handleStayDaysChange(res.id, e.target.value)}
-                            className="w-full text-center glass-input px-2 py-2.5 rounded-xl text-sm font-bold font-mono"
-                          />
-                        </div>
-                        <div className="hidden sm:block mt-0 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => handleVacationToggle(res.id)}
-                            className={`p-2.5 rounded-xl border transition-all ${
-                              isVacationActive
-                                ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400 font-bold'
-                                : 'bg-white hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800 border-neutral-300 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400'
-                            }`}
-                            title="Tatile Çıkar (0 Gün)"
-                          >
-                            <Palmtree className={`w-4 h-4 ${isVacationActive ? 'animate-bounce' : ''}`} />
-                          </button>
-                        </div>
+                            {/* Stay Days input */}
+                            <div className="w-20">
+                              <label className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 sm:hidden block mb-1">Gün</label>
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="30"
+                                  value={res.stayDays !== undefined ? res.stayDays : (res.isVacation ? 0 : 30)}
+                                  onChange={(e) => handleStayDaysChange(res.id, e.target.value)}
+                                  className="w-full text-center glass-input px-1.5 py-1.5 rounded-xl text-xs font-bold font-mono"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleVacationToggle(res.id)}
+                                  className={`p-1.5 rounded-xl border transition-all shrink-0 ${
+                                    isVacationActive
+                                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400 font-bold'
+                                      : 'bg-white hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800 border-neutral-300 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400'
+                                  }`}
+                                  title="Tatile Çıkar (0 Gün)"
+                                >
+                                  <Palmtree className={`w-3.5 h-3.5 ${isVacationActive ? 'animate-bounce' : ''}`} />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Detailed Period Button */}
+                            <button
+                              type="button"
+                              onClick={() => setActiveModalResident(res)}
+                              className="px-2 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 text-[10px] font-bold text-neutral-700 dark:text-neutral-300 bg-neutral-50 dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all flex items-center gap-1 shrink-0"
+                              title="30 günü parçalayarak farklı kişi sayıları gir"
+                            >
+                              <Calendar className="w-3 h-3 text-amber-500" />
+                              <span className="hidden md:inline">Detaylı Dönem</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -324,6 +380,14 @@ export default function SettingsPanel({ residents, apartmentName, onSaveSettings
           </button>
         </div>
       </form>
+
+      {activeModalResident && (
+        <DetailedPeriodModal
+          resident={activeModalResident}
+          onSave={handleSaveDetailedPeriods}
+          onClose={() => setActiveModalResident(null)}
+        />
+      )}
     </div>
   );
 }

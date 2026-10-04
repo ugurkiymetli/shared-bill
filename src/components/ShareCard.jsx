@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Image, Copy, Check, Table, Smartphone, Share2 } from 'lucide-react';
+import { Image, Copy, Check, Table, Smartphone, Share2, Download } from 'lucide-react';
 
 export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast }) {
   const [viewMode, setViewMode] = useState('mobile');
@@ -34,6 +34,39 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
     } catch { return dateStr; }
   };
 
+  // Helper to gather footnotes for splits with detailed periods or stay/vacation notes
+  const getFootnotes = (splits) => {
+    const fnSymbols = ['¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹', '¹⁰'];
+    const list = [];
+    splits.forEach((item) => {
+      let noteText = '';
+      if (item.entryMode === 'detailed' && Array.isArray(item.periods) && item.periods.length > 0) {
+        noteText = item.periods.map(p => `${p.days} Gün ${p.count} Kişi`).join(' + ');
+      } else {
+        const days = item.stayDays !== undefined ? item.stayDays : (item.isVacation ? 0 : 30);
+        if (days === 0) {
+          noteText = 'Tatilde (0 Gün Evde)';
+        } else if (days < 30) {
+          noteText = `${days} Gün Evde (${30 - days} Gün Tatil)`;
+        }
+      }
+      if (noteText) {
+        const index = list.length + 1;
+        list.push({
+          id: item.id || item.name,
+          name: item.name,
+          index,
+          symbol: fnSymbols[list.length] || `[${index}]`,
+          text: noteText
+        });
+      }
+    });
+    return list;
+  };
+
+  const footnotes = getFootnotes(bill.splits);
+  const fnMap = new Map(footnotes.map(f => [f.id, f]));
+
   // ── WhatsApp text copy ──────────────────────────────────────────────────────
   const handleCopyText = () => {
     setCopying(true);
@@ -43,14 +76,9 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
     text += `Son Ödeme Tarihi: ${formatDate(bill.dueDate)}\n`;
     text += `----------------------------\n`;
     bill.splits.forEach(item => {
-      const days = item.stayDays !== undefined ? item.stayDays : (item.isVacation ? 0 : 30);
-      let vacationLabel = '';
-      if (days === 0) {
-        vacationLabel = ' [Tatil]';
-      } else if (days < 30) {
-        vacationLabel = ` [${days} Gün]`;
-      }
-      text += `• ${item.name}${vacationLabel} (${item.count} Kişi): ₺${formatCurrency(item.share)}\n`;
+      const fn = fnMap.get(item.id || item.name);
+      const fnTag = fn ? ` ${fn.symbol}` : '';
+      text += `• ${item.name}${fnTag} (${item.count} Kişi): ₺${formatCurrency(item.share)}\n`;
       if (bill.type === 'electricity' && showDetails && item.breakdown) {
         const bd = item.breakdown;
         text += `  (Ortak: ₺${formatCurrency(bd.commonShare)} | Sabit: ₺${formatCurrency(bd.fixedShare)} | Kişisel: ₺${formatCurrency(bd.personalShare)})\n`;
@@ -64,6 +92,15 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
       const totalCount = activeSplits.reduce((s, i) => s + i.count, 0);
       text += `Kişi Başı Su Ücreti (Aktifler): ₺${formatCurrency(totalCount > 0 ? (bill.totalAmount / totalCount) : 0)}\n`;
     }
+
+    if (footnotes.length > 0) {
+      text += `----------------------------\n`;
+      text += `*Açıklamalar / Dipnotlar:*\n`;
+      footnotes.forEach(f => {
+        text += `[${f.index}] ${f.name}: ${f.text}\n`;
+      });
+    }
+
     navigator.clipboard.writeText(text)
       .then(() => {
         onAddToast({ type: 'success', message: 'Fatura metni WhatsApp formatında kopyalandı!' });
@@ -73,7 +110,7 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
   };
 
   // ── Canvas-based image export ───────────────────────────────────────────────
-  const handleExportImage = async () => {
+  const handleExportImage = async (forceDownload = false) => {
     setExporting(true);
     onAddToast({ type: 'info', message: 'Görsel oluşturuluyor...' });
 
@@ -98,7 +135,7 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
       const PAD    = 24;
       const ROW_H  = 38;
       const INFO_H = 120;        // header info block
-      const FOOT_H = 48;
+      const FOOT_H = footnotes.length > 0 ? (footnotes.length * 18 + 45) : 20;
 
       // Determine columns
       const showElecDetail = bill.type === 'electricity' && showDetails;
@@ -176,10 +213,8 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
         const rowBG = idx % 2 === 0 ? EVEN_BG : ODD_BG;
         rect(tableLeft, cy, tableW, ROW_H, rowBG);
 
-        const days = item.stayDays !== undefined ? item.stayDays : (item.isVacation ? 0 : 30);
-        const displayName = days === 0
-          ? `${item.name} (Tatil)`
-          : (days < 30 ? `${item.name} (${days}G)` : item.name);
+        const fn = fnMap.get(item.id || item.name);
+        const displayName = fn ? `${item.name} ${fn.symbol}` : item.name;
 
         const values = showElecDetail
           ? [
@@ -241,16 +276,26 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
       ctx.strokeRect(tableLeft, cy, tableW, ROW_H);
       cy += ROW_H;
 
-      // ── Footer note ──
-      cy += 12;
-      txt(`${apartmentName} Yönetimi tarafından otomatik hesaplanmıştır.`, W / 2, cy + 12, '10px Arial', MUTED, 'center');
+      // ── Footnote section at bottom of canvas ──
+      if (footnotes.length > 0) {
+        cy += 14;
+        ctx.strokeStyle = BORDER;
+        line(tableLeft, cy, tableLeft + tableW, cy);
+        cy += 16;
+        txt('Açıklamalar / Dipnotlar:', tableLeft, cy, 'bold 11px Arial', FG, 'left');
+        cy += 16;
+        footnotes.forEach(f => {
+          txt(`[${f.index}] ${f.name}: ${f.text}`, tableLeft, cy, '10px Arial', MUTED, 'left');
+          cy += 16;
+        });
+      }
 
       // ── Export ──
       const dataUrl = canvas.toDataURL('image/png');
       const fileName = `${apartmentName.replace(/\s+/g, '_')}_${bill.type}_${bill.period.replace(/\s+/g, '_')}.png`;
 
-      // Try Web Share (mobile)
-      if (navigator.share && navigator.canShare) {
+      // Try Web Share (mobile) if not forcing direct download
+      if (!forceDownload && navigator.share && navigator.canShare) {
         const res  = await fetch(dataUrl);
         const blob = await res.blob();
         const file = new File([blob], fileName, { type: 'image/png' });
@@ -267,12 +312,12 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
         }
       }
 
-      // Download fallback (desktop)
+      // Download fallback (desktop / Windows)
       const link = document.createElement('a');
       link.download = fileName;
       link.href = dataUrl;
       link.click();
-      onAddToast({ type: 'success', message: 'Tablo görseli indirildi!' });
+      onAddToast({ type: 'success', message: 'Tablo görseli bilgisayarınıza indirildi!' });
 
     } catch (err) {
       console.error('Canvas export hatası:', err);
@@ -369,21 +414,15 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
                       {idx + 1}
                     </div>
                     <div>
-                      <span className="font-bold text-neutral-900 dark:text-neutral-200 text-sm flex items-center gap-1.5">
+                      <span className="font-bold text-neutral-900 dark:text-neutral-200 text-sm flex items-center gap-1 flex-wrap">
                         {item.name}
                         {(() => {
-                          const days = item.stayDays !== undefined ? item.stayDays : (item.isVacation ? 0 : 30);
-                          if (days === 0) {
+                          const fn = fnMap.get(item.id || item.name);
+                          if (fn) {
                             return (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-[9px] font-bold text-amber-600 dark:text-amber-400 font-sans uppercase font-outfit">
-                                Tatil
-                              </span>
-                            );
-                          } else if (days < 30) {
-                            return (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-[9px] font-bold text-blue-600 dark:text-blue-400 font-sans uppercase font-outfit">
-                                {days} Gün
-                              </span>
+                              <sup className="text-xs font-extrabold text-purple-600 dark:text-purple-400 font-mono ml-0.5">
+                                {fn.symbol}
+                              </sup>
                             );
                           }
                           return null;
@@ -427,21 +466,15 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
                     <tr key={item.id || idx} className="hover:bg-neutral-100 dark:hover:bg-neutral-900/30">
                       <td className="p-3 border-r border-neutral-200 dark:border-neutral-800 text-center text-neutral-400 dark:text-neutral-500 font-bold">{idx + 1}</td>
                       <td className="p-3 border-r border-neutral-200 dark:border-neutral-800 font-sans font-bold text-neutral-900 dark:text-neutral-200">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 flex-wrap">
                           <span>{item.name}</span>
                           {(() => {
-                            const days = item.stayDays !== undefined ? item.stayDays : (item.isVacation ? 0 : 30);
-                            if (days === 0) {
+                            const fn = fnMap.get(item.id || item.name);
+                            if (fn) {
                               return (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-[9px] font-bold text-amber-600 dark:text-amber-400 font-sans uppercase font-outfit">
-                                  Tatil
-                                </span>
-                              );
-                            } else if (days < 30) {
-                              return (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-[9px] font-bold text-blue-600 dark:text-blue-400 font-sans uppercase font-outfit">
-                                  {days} Gün
-                                </span>
+                                <sup className="text-xs font-extrabold text-purple-600 dark:text-purple-400 font-mono ml-0.5">
+                                  {fn.symbol}
+                                </sup>
                               );
                             }
                             return null;
@@ -482,7 +515,7 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
           )}
 
           {/* Footer */}
-          <div className="pt-4 border-t border-neutral-200 dark:border-neutral-800/80 text-[10px] text-neutral-500 dark:text-neutral-500 font-medium space-y-1">
+          <div className="pt-4 border-t border-neutral-200 dark:border-neutral-800/80 text-[10px] text-neutral-500 dark:text-neutral-500 font-medium space-y-3">
             <p className="flex justify-between">
               <span>Bölüşüm Yöntemi:</span>
               <span className="text-neutral-800 dark:text-neutral-400 font-semibold">
@@ -493,9 +526,24 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
                   : 'Daire Başı Eşit Aidat Dağıtımı'}
               </span>
             </p>
-            <p className="text-center text-[9px] text-neutral-400 dark:text-neutral-600 pt-2 font-mono">
-              {apartmentName} Yönetimi tarafından otomatik hesaplanmıştır.
-            </p>
+
+            {footnotes.length > 0 && (
+              <div className="pt-3 border-t border-neutral-200 dark:border-neutral-800/80 space-y-1.5">
+                <span className="block text-[10px] font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                  Açıklamalar / Dipnotlar
+                </span>
+                <div className="space-y-1 text-xs text-neutral-700 dark:text-neutral-300">
+                  {footnotes.map(fn => (
+                    <div key={fn.index} className="flex items-start gap-1.5 font-sans text-[11px]">
+                      <span className="font-bold text-neutral-900 dark:text-neutral-100 font-mono text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1 rounded border border-neutral-200 dark:border-neutral-700">
+                        [{fn.index}]
+                      </span>
+                      <span><strong className="text-neutral-900 dark:text-neutral-200">{fn.name}:</strong> {fn.text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -505,22 +553,42 @@ export default function ShareCard({ bill, apartmentName = "Apartman", onAddToast
         <button
           onClick={handleCopyText}
           disabled={copying}
-          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 active:bg-neutral-100 dark:active:bg-neutral-950 text-neutral-800 dark:text-neutral-200 px-6 py-3 rounded-xl text-sm font-semibold transition-all shadow-md"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 px-5 py-3 rounded-xl text-sm font-semibold transition-all shadow-md active:scale-[0.99]"
         >
-          {copying ? (<><Check className="w-4 h-4 text-neutral-950 dark:text-white" />Kopyalandı!</>) : (<><Copy className="w-4 h-4 text-neutral-500 dark:text-neutral-400" />WhatsApp Metnini Kopyala</>)}
+          {copying ? (
+            <><Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />Kopyalandı!</>
+          ) : (
+            <><Copy className="w-4 h-4 text-neutral-500 dark:text-neutral-400" />WhatsApp Metni</>
+          )}
         </button>
 
         <button
-          onClick={handleExportImage}
+          onClick={() => handleExportImage(true)}
           disabled={exporting}
-          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-neutral-950 hover:bg-neutral-800 active:bg-neutral-900 dark:bg-white dark:hover:bg-neutral-200 dark:active:bg-neutral-100 text-white dark:text-neutral-950 px-6 py-3 rounded-xl text-sm font-semibold shadow-lg shadow-neutral-950/10 dark:shadow-neutral-950/35 transition-all"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 px-5 py-3 rounded-xl text-sm font-semibold transition-all shadow-md active:scale-[0.99]"
         >
-          {exporting
-            ? <span className="w-4 h-4 border-2 border-white/30 border-t-white dark:border-neutral-950/30 dark:border-t-neutral-950 rounded-full animate-spin" />
-            : <Share2 className="w-4 h-4" />}
-          Tabloyu Görsel Olarak Paylaş / İndir
+          {exporting ? (
+            <span className="w-4 h-4 border-2 border-neutral-900/30 border-t-neutral-900 dark:border-white/30 dark:border-t-white rounded-full animate-spin" />
+          ) : (
+            <Download className="w-4 h-4 text-neutral-500 dark:text-neutral-400" />
+          )}
+          Görseli İndir
+        </button>
+
+        <button
+          onClick={() => handleExportImage(false)}
+          disabled={exporting}
+          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-neutral-950 hover:bg-neutral-850 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-neutral-950 px-5 py-3 rounded-xl text-sm font-semibold shadow-lg transition-all active:scale-[0.99]"
+        >
+          {exporting ? (
+            <span className="w-4 h-4 border-2 border-white/30 border-t-white dark:border-neutral-950/30 dark:border-t-neutral-950 rounded-full animate-spin" />
+          ) : (
+            <Share2 className="w-4 h-4" />
+          )}
+          Görsel Paylaş
         </button>
       </div>
     </div>
   );
 }
+
